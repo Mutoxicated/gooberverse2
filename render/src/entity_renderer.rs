@@ -37,7 +37,12 @@ impl EntityRenderer {
             ebo: 0,
         };
 
-        let (verts, colors, indices, normals, barys) = instance.mesh.get_tuple_slice();
+        let verts = instance.mesh.vertices.as_slice();
+        let colors = instance.mesh.colors.as_slice();
+        let indices = instance.mesh.indices.as_slice();
+        let normals = instance.mesh.normals.as_slice();
+        let barys = instance.mesh.barycentrics.as_slice();
+        
         unsafe {
             GenBuffers(1, &mut instance.vbo_v as *mut c_uint);
             GenBuffers(1, &mut instance.vbo_c as *mut c_uint);

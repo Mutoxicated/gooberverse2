@@ -4,3 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+futures = "0.3.32"
+gl = "0.14.0"
+glam = "0.30.9"
+glfw = "0.61.0"
+ordered-float = "5.1.0"
+render = { path="../render/"}

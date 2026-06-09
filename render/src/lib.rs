@@ -1,14 +1,13 @@
 pub mod advanced_wire;
 pub mod entity_renderer;
 
-use std::{ffi::{CStr, CString, c_char, c_int, c_uint}, fmt::Display, os::raw::c_void};
+use std::{ffi::{CStr, CString, c_char, c_int, c_uint}, fmt::Display};
 use gl::{
     AttachShader, COMPILE_STATUS, CompileShader, CreateProgram, CreateShader, DeleteProgram, DeleteShader, FALSE, FRAGMENT_SHADER, GetProgramInfoLog, GetProgramiv, GetShaderInfoLog, GetShaderiv, GetUniformLocation, INFO_LOG_LENGTH, LINK_STATUS, LinkProgram, ShaderSource, Uniform1f, Uniform3fv, UniformMatrix4fv, UseProgram, VERTEX_SHADER
 };
-use gl::{
-    ARRAY_BUFFER, BindBuffer, BindVertexArray, BufferData, DeleteBuffers, DeleteVertexArrays, DrawElements, ELEMENT_ARRAY_BUFFER, EnableVertexAttribArray, FLOAT, GenBuffers, GenVertexArrays, STATIC_DRAW, TRIANGLES, UNSIGNED_INT, VertexAttribPointer
-};
 use glam::{Mat4, Vec3};
+
+pub use entity_renderer::EntityRenderer;
 
 #[derive(PartialEq)]
 pub enum WireType {
@@ -118,16 +117,6 @@ pub struct Mesh {
 }
 
 impl Mesh {
-    pub fn get_tuple_slice(&self) -> (&[f32], &[f32], &[c_uint], &[f32], &[f32]) {
-        (
-            self.vertices.as_slice(),
-            self.colors.as_slice(),
-            self.indices.as_slice(),
-            self.normals.as_slice(),
-            self.barycentrics.as_slice(),
-        )
-    }
-
     pub fn bake_wireframe(&mut self, wire_type: WireType) {
         if wire_type == WireType::Triangle {
             return;
@@ -298,148 +287,6 @@ impl InnerObjectShader {
                 return;
             }
             UniformMatrix4fv(a, 1, FALSE, mat.as_ref().as_ptr());
-        }
-    }
-}
-
-pub struct EntityRenderer {
-    mesh: Mesh,
-
-    vao: c_uint,
-    vbo_v: c_uint,
-    vbo_c: c_uint,
-    vbo_n: c_uint,
-    vbo_b: c_uint,
-    ebo: c_uint,
-}
-
-impl Drop for EntityRenderer {
-    fn drop(&mut self) {
-        unsafe {
-            DeleteVertexArrays(1, &self.vao);
-            DeleteBuffers(1, &self.vbo_v);
-            DeleteBuffers(1, &self.vbo_c);
-            DeleteBuffers(1, &self.vbo_n);
-            DeleteBuffers(1, &self.vbo_b);
-            DeleteBuffers(1, &self.ebo);
-        }
-    }
-}
-
-impl EntityRenderer {
-    pub fn init(mesh: Mesh) -> Self {
-        let mut instance = Self {
-            mesh,
-            vao: 0,
-            vbo_v: 0,
-            vbo_c: 0,
-            vbo_n: 0,
-            vbo_b: 0,
-            ebo: 0,
-        };
-
-        let (verts, colors, indices, normals, barys) = instance.mesh.get_tuple_slice();
-        unsafe {
-            GenBuffers(1, &mut instance.vbo_v as *mut c_uint);
-            GenBuffers(1, &mut instance.vbo_c as *mut c_uint);
-            GenBuffers(1, &mut instance.vbo_n as *mut c_uint);
-            GenBuffers(1, &mut instance.vbo_b as *mut c_uint);
-            GenBuffers(1, &mut instance.ebo as *mut c_uint);
-            GenVertexArrays(1, &mut instance.vao as *mut c_uint);
-
-            BindVertexArray(instance.vao);
-
-            BindBuffer(ARRAY_BUFFER, instance.vbo_v);
-            BufferData(
-                ARRAY_BUFFER,
-                size_of_val(verts) as isize,
-                verts.as_ptr() as *const c_void,
-                STATIC_DRAW,
-            );
-            VertexAttribPointer(
-                0,
-                3,
-                FLOAT,
-                FALSE,
-                3 * size_of::<f32>() as c_int,
-                std::ptr::null(),
-            );
-
-            BindBuffer(ARRAY_BUFFER, instance.vbo_c);
-            BufferData(
-                ARRAY_BUFFER,
-                size_of_val(colors) as isize,
-                colors.as_ptr() as *const c_void,
-                STATIC_DRAW,
-            );
-            VertexAttribPointer(
-                1,
-                4,
-                FLOAT,
-                FALSE,
-                4 * size_of::<f32>() as c_int,
-                std::ptr::null(),
-            );
-
-            BindBuffer(ARRAY_BUFFER, instance.vbo_n);
-            BufferData(
-                ARRAY_BUFFER,
-                size_of_val(normals) as isize,
-                normals.as_ptr() as *const c_void,
-                STATIC_DRAW,
-            );
-            VertexAttribPointer(
-                2,
-                3,
-                FLOAT,
-                FALSE,
-                3 * size_of::<f32>() as c_int,
-                std::ptr::null(),
-            );
-
-            BindBuffer(ARRAY_BUFFER, instance.vbo_b);
-            BufferData(
-                ARRAY_BUFFER,
-                size_of_val(barys) as isize,
-                barys.as_ptr() as *const c_void,
-                STATIC_DRAW,
-            );
-            VertexAttribPointer(
-                3,
-                3,
-                FLOAT,
-                FALSE,
-                3 * size_of::<f32>() as c_int,
-                std::ptr::null(),
-            );
-
-            EnableVertexAttribArray(0);
-            EnableVertexAttribArray(1);
-            EnableVertexAttribArray(2);
-            EnableVertexAttribArray(3);
-
-            BindBuffer(ELEMENT_ARRAY_BUFFER, instance.ebo);
-            BufferData(
-                ELEMENT_ARRAY_BUFFER,
-                size_of_val(indices) as isize,
-                indices.as_ptr() as *const c_void,
-                STATIC_DRAW,
-            );
-        }
-
-        instance
-    }
-
-    pub fn draw(&self) {
-        unsafe {
-            BindVertexArray(self.vao);
-            DrawElements(
-                TRIANGLES,
-                self.mesh.indices.len() as c_int,
-                UNSIGNED_INT,
-                std::ptr::null(),
-            );
-            BindVertexArray(0);
         }
     }
 }
