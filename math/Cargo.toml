@@ -1,0 +1,8 @@
+[package]
+name = "math"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+glam = "0.30.9"
+rand = "0.10.1"
