@@ -10,7 +10,7 @@ The engine is still pre 0.1 state.
 
 # Design decisions
 
-## Why Rust?
+## Choosing Rust
 
 I chose Rust because it is one of the languages that I really like since I never had any of the problems and inconveniences I've had with all other languages I've used (C#, C, C++ (*although admittedly not that much time with c++*), go and lua). On top of that, it has some amazing capabilities like proc macros and, most important of all, makes it easy for you to have a good workflow once you understand how the rust compiler thinks. Not only that, it has a really good idiomacy.
 
