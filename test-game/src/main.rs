@@ -1,5 +1,8 @@
-use engine::Engine;
+use engine::{Engine, EngineBuilder};
 
 fn main() {
-    Engine::start(1000, 1000);
+    let eb = EngineBuilder::new(1000, 1000)("../resources", Vec::new());
+    Engine::start(eb, |api| {
+        api.new_entity();
+    });
 }

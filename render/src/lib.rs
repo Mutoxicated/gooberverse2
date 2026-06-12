@@ -139,13 +139,24 @@ impl Display for GraphicsError {
     }
 }
 
+/// # IMPORTANT NOTE
+
+/// A type `T` is `Send`, given that when a value of type `T` is owned by **two** different 
+/// threads, any manipulation of that data will not lead to UB.
+///
+/// **Implementing the `Send` trait, as a user of this type I hereby promise that 
+/// any value of type `ObjectShader` will NEVER be co-owned by more than 1 thread, 
+/// and therefore will NEVER be manipulated by more than 1 thread, and so it will 
+/// ALWAYS be `Send` -able.**
+/// 
+/// - UB Prevention Services
 pub struct ObjectShader {
     pub shader: InnerObjectShader,
-    pub info: Box<dyn ShaderInfo>
+    pub info: Box<dyn ShaderInfo + Send>
 }
 
 impl ObjectShader {
-    pub fn new(info: Box<dyn ShaderInfo>, path:String) -> Self {
+    pub fn new(info: Box<dyn ShaderInfo + Send>, path:String) -> Self {
         let shader = InnerObjectShader::new(info.name(), path).unwrap();
         Self { shader, info }
     }
