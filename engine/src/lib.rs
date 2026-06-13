@@ -1,144 +1,41 @@
-mod utils;
-mod runtime;
-mod transform;
 mod camera;
 mod constants;
+mod transform;
+mod utils;
+mod renderer;
+mod game_state;
+mod app;
 
-use std::{any::Any, sync::mpsc::{Receiver, Sender}, thread::{self}};
+pub use game_state::GameState;
 
-use gl::{BLEND, COLOR_BUFFER_BIT, DEPTH_BUFFER_BIT, DEPTH_TEST, MULTISAMPLE, ONE_MINUS_SRC_ALPHA, SRC_ALPHA};
+use std::{
+    thread::{self}
+};
+
+use gl::{
+    BLEND, DEPTH_TEST, MULTISAMPLE, ONE_MINUS_SRC_ALPHA,
+    SRC_ALPHA,
+};
 use glfw::{Context, Glfw, GlfwReceiver, PWindow, WindowEvent};
 use render::{ObjectShader, ShaderInfo};
 
-use crate::{camera::Camera, transform::Transform};
+use crate::{app::{App, ToApp}, renderer::{Renderer, ToRenderer}};
+
+/// Note: game_state does not include the custom entity itself (i.e. the `self`)
+pub trait CustomEntity: Send + 'static {
+    fn start(&mut self, game_state: &mut GameState);
+    fn update(&mut self, game_state: &mut GameState, delta_time:f32);
+    fn mesh(&self) -> render::Mesh;
+}
 
 pub struct EngineBuilder {
     width: u32,
     height: u32,
-    object_shaders: Vec<ObjectShader>
+    shaders_path: String,
+    shader_info: Option<Vec<Box<dyn ShaderInfo + Send + 'static>>>,
 }
 
 impl EngineBuilder {
-    pub fn new(width: u32, height: u32) -> Box<dyn FnOnce(&str, Vec<Box<dyn ShaderInfo + Send>>) -> EngineBuilder> {
-        Box::new(move |shaders_path:&str, shader_info: Vec<Box<dyn ShaderInfo + Send>>| {
-            let mut object_shaders:Vec<ObjectShader> = Vec::new();
-            for v in shader_info {
-                object_shaders.push(ObjectShader::new(v, shaders_path.to_owned()));
-            }
-            EngineBuilder { width, height, object_shaders }
-        })
-    }
-}
-
-pub struct EntityInternal {
-    pub id: u64,
-    pub drawer: render::EntityRenderer,
-    pub transform: Transform,
-}
-
-pub trait CustomEntity {
-    fn start(&mut self, entity: &mut EntityInternal);
-    fn update(&mut self, entity: &mut EntityInternal, delta_time: f32);
-    fn mesh(&self) -> render::Mesh;
-    fn shaders_to_use(&self) -> Vec<u8>;
-
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-}
-
-pub struct Entity {
-    pub inner: EntityInternal,
-    pub interface: Box<dyn CustomEntity + Send>
-}
-
-enum ToRenderer {
-    Render(Vec<Entity>, Camera)
-}
-
-enum ToCore {
-    RenderDone,
-}
-
-pub struct API<'a> {
-    core: &'a mut Core
-}
-
-impl<'a> API<'a> {
-    pub fn new_entity(&self) -> () {
-    }
-}
-
-struct Renderer {
-    shaders: Vec<ObjectShader>,
-    from_core: Receiver<ToRenderer>
-}
-
-impl Renderer {
-    fn runtime_loop(mut self) {
-        use ToRenderer::*;
-
-        while let Ok(msg) = self.from_core.recv() {
-            match msg {
-                Render(entities, camera) => {
-                    self.render(entities, camera);
-                }
-            }
-        }
-    }
-
-    fn render(&mut self, entities: Vec<Entity>, camera: Camera) {
-        unsafe { gl::Clear(COLOR_BUFFER_BIT | DEPTH_BUFFER_BIT); }
-
-        let (proj, view) = (camera.proj_matrix(), camera.view_matrix());
-        for os in &self.shaders {
-            os.shader.activate();
-            os.shader.set_mat4("proj", proj);
-            os.shader.set_mat4("view", view);
-            os.shader.set_float("scale", WORLD_SCALE!());
-        }
-        let special_unis = render::SpecialUnis{cam_pos:camera.position};
-        for go in entities {
-            let entity = &go.inner;
-            for shader_index in go.interface.shaders_to_use() {
-                let os = &self.shaders[shader_index as usize];
-                os.shader.activate();
-                os.shader.set_mat4("model", entity.transform.model_matrix());
-                os.info.set_special_uniforms(&special_unis, &os.shader);
-                entity.drawer.draw();
-            }
-        }
-        get_gl_error!();
-    }
-}
-
-pub struct Core {
-    glfw: Glfw,
-    window: PWindow,
-    events: GlfwReceiver<(f64, WindowEvent)>,
-    to_renderer: Sender<ToRenderer>
-}
-
-impl Core {
-    fn start_runtime<F>(mut self, mut custom_runtime: F)
-    where F: FnMut(API) 
-    {
-        let mut delta_time = 0f32;
-        let mut prev_time = self.glfw.get_time();
-        while !self.window.should_close() {
-            let time = self.glfw.get_time();
-            delta_time = (time-prev_time) as f32;
-            prev_time = time;
-
-            let api = API { core: &mut self };
-            custom_runtime(api);
-
-            self.glfw.poll_events();
-        }
-    }
-}
-
-pub struct Engine;
-
-impl Engine {
     fn glfw_constructor() -> Glfw {
         let mut glfw = glfw::init(|e, desc| {
             exit!("GLFW failed. \n* Error: '{}'\n* Description: '{}'", e, desc);
@@ -156,12 +53,15 @@ impl Engine {
         glfw
     }
 
-    fn window_event_constructor(glfw:&mut Glfw, width:u32, height:u32) -> (PWindow, GlfwReceiver<(f64, WindowEvent)>) {
+    fn window_event_constructor(
+        glfw: &mut Glfw,
+        width: u32,
+        height: u32,
+    ) -> (PWindow, GlfwReceiver<(f64, WindowEvent)>) {
         let (mut window, events) = glfw
             .create_window(
                 width,
                 height,
-
                 "Powered by GooberVerse",
                 glfw::WindowMode::Windowed,
             )
@@ -193,26 +93,71 @@ impl Engine {
         (window, events)
     }
 
-    pub fn start<F>(eb: EngineBuilder, custom_runtime: F) 
-    where F: FnMut(API)
+    pub fn builder() -> Self {
+        Self {
+            width: 0,
+            height: 0,
+            shaders_path: String::new(),
+            shader_info: None,
+        }
+    }
+
+    pub fn res(mut self, w: u32, h: u32) -> Self {
+        self.width = w;
+        self.height = h;
+        self
+    }
+
+    pub fn shaders_path(mut self, v: String) -> Self {
+        self.shaders_path = v;
+        self
+    }
+
+    pub fn shader_info(mut self, v: Vec<Box<dyn ShaderInfo + Send + 'static>>) -> Self {
+        self.shader_info = Some(v);
+        self
+    }
+
+    pub fn build(self) -> Engine
     {
-        thread::scope(|s| {
-            let mut glfw = Self::glfw_constructor();
-            let (window, events) = Self::window_event_constructor(&mut glfw, eb.width, eb.height);
-            let (sender, r) = std::sync::mpsc::channel::<ToRenderer>();
-            let core = Core {
-                glfw, 
-                window, 
-                events,
-                to_renderer: sender
-            };
-            let render = Renderer { 
-                shaders: eb.object_shaders,
-                from_core: r
-            };
-            
-            s.spawn(move || render.runtime_loop());
-            core.start_runtime(custom_runtime);
-        });
+        assert_ne!(self.width, 0);
+        assert_ne!(self.height, 0);
+        assert_ne!(self.shaders_path, "".to_owned());
+        assert!(self.shader_info.is_some());
+
+        let mut glfw = Self::glfw_constructor();
+        let (window, events) =
+            Self::window_event_constructor(&mut glfw, self.width, self.height);
+        let mut obj_shaders: Vec<ObjectShader> = Vec::new();
+        for v in self.shader_info.unwrap() {
+            obj_shaders.push(ObjectShader::new(v, self.shaders_path.to_owned()));
+        }
+        let (sender, r) = std::sync::mpsc::channel::<ToRenderer>();
+        let (sender2, r2) = std::sync::mpsc::channel::<ToApp>();
+
+        let app = App {
+            glfw,
+            window,
+            events,
+            to_renderer: sender,
+            inbox: r2,
+            game_state: GameState::default()
+        };
+        let renderer = Renderer::new(obj_shaders, r, sender2);
+
+        Engine { renderer, app }
+    }
+}
+
+
+pub struct Engine {
+    renderer: Renderer,
+    pub app: App
+}
+
+impl Engine {
+    pub fn run(self, func: impl FnMut(&mut App)) {
+        thread::spawn(move || self.renderer);
+        self.app.start_runtime(func);
     }
 }

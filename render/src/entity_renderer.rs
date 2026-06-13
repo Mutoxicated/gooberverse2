@@ -1,6 +1,17 @@
+use {
+    crate::Mesh,
+    gl::{
+        ARRAY_BUFFER, BindBuffer, BindVertexArray, BufferData, DeleteBuffers, DeleteVertexArrays,
+        DrawElements, ELEMENT_ARRAY_BUFFER, EnableVertexAttribArray, FALSE, FLOAT, GenBuffers,
+        GenVertexArrays, STATIC_DRAW, TRIANGLES, UNSIGNED_INT, VertexAttribPointer,
+    },
+    std::{
+        ffi::{c_int, c_uint},
+        os::raw::c_void,
+    },
+};
 
-use {crate::Mesh, gl::{ARRAY_BUFFER, BindBuffer, BindVertexArray, BufferData, DeleteBuffers, DeleteVertexArrays, DrawElements, ELEMENT_ARRAY_BUFFER, EnableVertexAttribArray, FALSE, FLOAT, GenBuffers, GenVertexArrays, STATIC_DRAW, TRIANGLES, UNSIGNED_INT, VertexAttribPointer}, std::{ffi::{c_int, c_uint}, os::raw::c_void}};
-
+#[derive(Clone)]
 pub struct EntityRenderer {
     mesh: Mesh,
 
@@ -42,7 +53,7 @@ impl EntityRenderer {
         let indices = instance.mesh.indices.as_slice();
         let normals = instance.mesh.normals.as_slice();
         let barys = instance.mesh.barycentrics.as_slice();
-        
+
         unsafe {
             GenBuffers(1, &mut instance.vbo_v as *mut c_uint);
             GenBuffers(1, &mut instance.vbo_c as *mut c_uint);
