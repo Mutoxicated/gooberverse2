@@ -6,3 +6,5 @@ edition = "2024"
 [dependencies]
 engine = {path="../engine"}
 render = {path="../render"}
+glam = "0.30.9"
+lazy_static = "1.5.0"

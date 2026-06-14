@@ -3,9 +3,9 @@ use glam::{Mat4, Quat, Vec3};
 use crate::WORLD_SCALE;
 
 pub struct Transform {
-    pub position: Vec3,
-    pub rotation: Quat,
-    pub scale: Vec3,
+    pub(crate) position: Vec3,
+    pub(crate) rotation: Quat,
+    pub(crate) scale: Vec3,
 }
 
 impl Default for Transform {
@@ -25,6 +25,34 @@ impl Transform {
             self.rotation,
             self.position * WORLD_SCALE!(),
         )
+    }
+
+    pub fn rot(&self) -> Quat {
+        self.rotation
+    }
+
+    pub fn rot_euler(&self) -> Vec3 {
+        self.rotation.to_euler(glam::EulerRot::XYZ).into()
+    }
+
+    pub fn pos(&self) -> Vec3 {
+        self.position
+    }
+
+    pub fn scale(&self) -> Vec3 {
+        self.scale
+    }
+
+    pub fn add_rotation(&mut self, rot: Vec3) {
+        self.rotation += Quat::from_euler(glam::EulerRot::ZXY, rot.z, rot.x, rot.y);
+    }
+
+    pub fn add_position(&mut self, pos: Vec3) {
+        self.position += pos;
+    }
+
+    pub fn add_scale(&mut self, scale: Vec3) {
+        self.scale += scale;
     }
 
     pub fn set_rotation(&mut self, rot: Vec3) {

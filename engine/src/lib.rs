@@ -1,38 +1,63 @@
+mod app;
 mod camera;
 mod constants;
+mod game_state;
+mod renderer;
 mod transform;
 mod utils;
-mod renderer;
-mod game_state;
-mod app;
 
 pub use game_state::GameState;
+pub use game_state::InternalEntity;
+use glam::Vec3;
+use glfw::ffi::GLFW_PLATFORM_NULL;
+use glfw::ffi::GLFWwindow;
+use glfw::ffi::glfwMakeContextCurrent;
 
-use std::{
-    thread::{self}
+pub const FRONT: Vec3 = Vec3 {
+    x: 0.0,
+    y: 0.0,
+    z: 1.0,
+};
+pub const UP: Vec3 = Vec3 {
+    x: 0.0,
+    y: 1.0,
+    z: 0.0,
+};
+pub const RIGHT: Vec3 = Vec3 {
+    x: 1.0,
+    y: 0.0,
+    z: 0.0,
 };
 
-use gl::{
-    BLEND, DEPTH_TEST, MULTISAMPLE, ONE_MINUS_SRC_ALPHA,
-    SRC_ALPHA,
-};
+use gl::{BLEND, DEPTH_TEST, MULTISAMPLE, ONE_MINUS_SRC_ALPHA, SRC_ALPHA};
 use glfw::{Context, Glfw, GlfwReceiver, PWindow, WindowEvent};
 use render::{ObjectShader, ShaderInfo};
 
-use crate::{app::{App, ToApp}, renderer::{Renderer, ToRenderer}};
+use crate::game_state::ToGameState;
+use crate::{
+    app::{App, ToApp},
+    renderer::{Renderer},
+};
 
 /// Note: game_state does not include the custom entity itself (i.e. the `self`)
 pub trait CustomEntity: Send + 'static {
-    fn start(&mut self, game_state: &mut GameState);
-    fn update(&mut self, game_state: &mut GameState, delta_time:f32);
-    fn mesh(&self) -> render::Mesh;
+    fn start(&mut self, inner: &mut InternalEntity, game_state: &mut GameState);
+    fn fixed_update(
+        &mut self,
+        inner: &mut InternalEntity,
+        game_state: &mut GameState,
+        fixed_dt: f32,
+    );
+    fn mesh(&self) -> &render::Mesh;
+    fn shaders_to_use(&self) -> Vec<u8>;
 }
 
 pub struct EngineBuilder {
     width: u32,
     height: u32,
     shaders_path: String,
-    shader_info: Option<Vec<Box<dyn ShaderInfo + Send + 'static>>>,
+    shader_info: Option<Vec<Box<dyn ShaderInfo>>>,
+    fixed_step_sec: u64,
 }
 
 impl EngineBuilder {
@@ -89,7 +114,6 @@ impl EngineBuilder {
             gl::BlendFunc(SRC_ALPHA, ONE_MINUS_SRC_ALPHA);
             gl::Enable(BLEND);
         }
-
         (window, events)
     }
 
@@ -99,6 +123,7 @@ impl EngineBuilder {
             height: 0,
             shaders_path: String::new(),
             shader_info: None,
+            fixed_step_sec: 100,
         }
     }
 
@@ -108,56 +133,61 @@ impl EngineBuilder {
         self
     }
 
-    pub fn shaders_path(mut self, v: String) -> Self {
-        self.shaders_path = v;
+    pub fn shaders_path(mut self, v: &str) -> Self {
+        self.shaders_path = v.to_owned();
         self
     }
 
-    pub fn shader_info(mut self, v: Vec<Box<dyn ShaderInfo + Send + 'static>>) -> Self {
+    pub fn shader_info(mut self, v: Vec<Box<dyn ShaderInfo>>) -> Self {
         self.shader_info = Some(v);
         self
     }
 
-    pub fn build(self) -> Engine
-    {
+    pub fn with_fixed_timestep(mut self, timestep_sec: u64) -> Self {
+        self.fixed_step_sec = timestep_sec;
+        self
+    }
+
+    pub fn build(self) -> Engine {
         assert_ne!(self.width, 0);
         assert_ne!(self.height, 0);
         assert_ne!(self.shaders_path, "".to_owned());
         assert!(self.shader_info.is_some());
 
         let mut glfw = Self::glfw_constructor();
-        let (window, events) =
-            Self::window_event_constructor(&mut glfw, self.width, self.height);
+        let (window, events) = Self::window_event_constructor(&mut glfw, self.width, self.height);
         let mut obj_shaders: Vec<ObjectShader> = Vec::new();
         for v in self.shader_info.unwrap() {
             obj_shaders.push(ObjectShader::new(v, self.shaders_path.to_owned()));
         }
-        let (sender, r) = std::sync::mpsc::channel::<ToRenderer>();
-        let (sender2, r2) = std::sync::mpsc::channel::<ToApp>();
 
+        let (sender, r) = std::sync::mpsc::channel::<ToGameState>();        
+        let (sender2, r2) = std::sync::mpsc::channel::<ToApp>();
+        let sender2_copy = sender2.clone();
+
+        let renderer = Renderer::new(obj_shaders, sender2);
         let app = App {
             glfw,
             window,
             events,
-            to_renderer: sender,
+            renderer,
             inbox: r2,
-            game_state: GameState::default()
+            to_game_state: sender
         };
-        let renderer = Renderer::new(obj_shaders, r, sender2);
+        let game_state = GameState::new(self.fixed_step_sec, sender2_copy, r);
 
-        Engine { renderer, app }
+        Engine { app, game_state }
     }
 }
 
-
 pub struct Engine {
-    renderer: Renderer,
-    pub app: App
+    pub app: App,
+    pub game_state: GameState
 }
 
 impl Engine {
     pub fn run(self, func: impl FnMut(&mut App)) {
-        thread::spawn(move || self.renderer);
+        self.game_state.start_runtime();
         self.app.start_runtime(func);
     }
 }

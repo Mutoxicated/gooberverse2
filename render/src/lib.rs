@@ -1,5 +1,6 @@
 pub mod advanced_wire;
 pub mod entity_renderer;
+pub use entity_renderer::EntityRenderer;
 
 use gl::{
     AttachShader, COMPILE_STATUS, CompileShader, CreateProgram, CreateShader, DeleteProgram,
@@ -13,7 +14,18 @@ use std::{
     fmt::Display,
 };
 
-pub use entity_renderer::EntityRenderer;
+pub mod uniform {
+    ///mat4
+    pub const PROJ:&str = "proj";
+    ///mat4
+    pub const VIEW:&str = "view";
+    ///mat4
+    pub const MODEL:&str = "model";
+    ///float
+    pub const SCALE:&str = "scale";
+    
+}
+    
 
 #[derive(PartialEq)]
 pub enum WireType {
@@ -25,62 +37,87 @@ pub enum WireType {
     Advanced,
 }
 
+/// A builder for building meshes.A
+/// 
+/// The correct way to use it is like so:
+/// ```
+/// let mesh = MeshBuilder::builder(vec![-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 0.0])
+///     .with_colors(vec![0.4, 0.0, 0.0, 1.0, 0.4, 0.0, 0.9, 1.0, 0.0, 1.0, 0.0, 1.0, 0.1, 0.3, 1.0, 1.0 ])
+///     .with_indices(vec![0,1,2,3,0])
+///     .build();
+/// 
+/// // or like this
+/// let mesh = MeshBuilder::builder(vec![-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 0.0])
+///     .with_indices(vec![0,1,2,3,0])
+///     .with_colors(vec![0.4, 0.0, 0.0, 1.0, 0.4, 0.0, 0.9, 1.0, 0.0, 1.0, 0.0, 1.0, 0.1, 0.3, 1.0, 1.0 ])
+///     .build();
+/// ```
+#[derive(Default)]
 pub struct MeshBuilder {
-    vertices: Vec<f32>,
-    colors: Vec<f32>,
-    #[allow(dead_code)]
-    indices: Vec<c_uint>,
-    normals: Vec<f32>,
+    vertices: Option<Vec<f32>>,
+    colors: Option<Vec<f32>>,
+    indices: Option<Vec<c_uint>>,
+    normals: Option<Vec<f32>>,
+    _invalid: bool
 }
 
 impl MeshBuilder {
-    pub fn with_verts(verts: Vec<f32>) -> Self {
+    pub fn builder(verts: Vec<f32>) -> Self {
+        let mut a = Self::default();
         if verts.len() < 9 {
             println!(
                 "Invalid mesh vertices. It won't be renderable because it doesn't have enough vertices for at least one triangle."
             );
-            return Self {
-                vertices: verts,
-                colors: Vec::new(),
-                indices: Vec::new(),
-                normals: Vec::new(),
-            };
+            a._invalid = true;
         }
+        a.vertices = Some(verts);
+        a
 
-        Self {
-            vertices: verts,
-            colors: Vec::new(),
-            indices: Vec::new(),
-            normals: Vec::new(),
-        }
     }
 
     pub fn with_colors(mut self, colors: Vec<f32>) -> Self {
-        if colors.len() / 4 != self.vertices.len() / 3 {
+
+        if colors.len() / 4 != self.vertices.as_ref().unwrap().len() / 3 {
             println!(
                 "Invalid mesh data. Amount of colors != Amount of vertices. (Maybe you didn't give the alpha channels?)"
-            )
+            );
+            self._invalid = true;
         }
-        self.colors = colors;
+        self.colors = Some(colors);
         self
     }
 
-    pub fn with_indices(mut self, indices: Vec<c_uint>) -> Mesh {
+    pub fn with_indices(mut self, mut indices: Vec<c_uint>) -> Self {
         if indices.len() < 3 {
             println!("Invalid mesh data. Indices must be more than 2 to form at least 1 triangle.");
+            self._invalid = true;
         } else if indices.len() % 3 != 0 {
             println!("Invalid mesh data. Indices must be in pairs of 3.");
+            self._invalid = true;
         }
+        self.indices = Some(indices);
+        self
+    }
+
+    pub fn build(mut self) -> Mesh {
+        assert_ne!(self.colors, None);
+        assert_ne!(self.indices, None);
+
+        let indices = self.indices.unwrap();
+        let colors = self.colors.unwrap();
+        let vertices = self.vertices.unwrap();
+        self.normals = Some(vec![]);
+
         let mut new_verts: Vec<f32> = Vec::new();
         let mut new_colors: Vec<f32> = Vec::new();
         let mut i = 0;
         while i <= indices.len() - 3 {
             let a = indices[i] as usize * 3;
-            let one = Vec3::new(self.vertices[a], self.vertices[a + 1], self.vertices[a + 2]);
+            let one = Vec3::new(vertices[a], vertices[a + 1], vertices[a + 2]);
             let b = indices[i + 1] as usize * 3;
-            let two = Vec3::new(self.vertices[b], self.vertices[b + 1], self.vertices[b + 2]);
+            let two = Vec3::new(vertices[b], vertices[b + 1], vertices[b + 2]);
             let c = indices[i + 2] as usize * 3;
-            let three = Vec3::new(self.vertices[c], self.vertices[c + 1], self.vertices[c + 2]);
+            let three = Vec3::new(vertices[c], vertices[c + 1], vertices[c + 2]);
 
             let vector1 = two - one;
             let vector2 = three - one;
@@ -91,7 +128,7 @@ impl MeshBuilder {
                 normal = vector2.cross(vector1).normalize();
             }
 
-            self.normals.extend_from_slice(&[
+            self.normals.as_mut().unwrap().extend_from_slice(&[
                 normal.x, normal.y, normal.z, normal.x, normal.y, normal.z, normal.x, normal.y,
                 normal.z,
             ]);
@@ -102,18 +139,18 @@ impl MeshBuilder {
             let b = indices[i + 1] as usize * 4;
             let c = indices[i + 2] as usize * 4;
             new_colors.extend_from_slice(&[
-                self.colors[a],
-                self.colors[a + 1],
-                self.colors[a + 2],
-                self.colors[a + 3],
-                self.colors[b],
-                self.colors[b + 1],
-                self.colors[b + 2],
-                self.colors[b + 3],
-                self.colors[c],
-                self.colors[c + 1],
-                self.colors[c + 2],
-                self.colors[c + 3],
+                colors[a],
+                colors[a + 1],
+                colors[a + 2],
+                colors[a + 3],
+                colors[b],
+                colors[b + 1],
+                colors[b + 2],
+                colors[b + 3],
+                colors[c],
+                colors[c + 1],
+                colors[c + 2],
+                colors[c + 3],
             ]);
 
             i += 3;
@@ -124,22 +161,36 @@ impl MeshBuilder {
             vertices: new_verts,
             colors: new_colors,
             indices: new_indices,
-            normals: self.normals,
+            normals: self.normals.unwrap(),
             barycentrics: [0.1, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1].repeat(new_verts_len / 3),
+            _invalid: self._invalid
         }
     }
 }
 
-#[derive(Debug, Clone)]
+
+/// A mesh.
+/// A color value is in the range [0, 1.0]
+#[derive(Debug, Clone, Default)]
 pub struct Mesh {
     pub vertices: Vec<f32>,
     pub colors: Vec<f32>,
     pub indices: Vec<c_uint>,
     pub normals: Vec<f32>,
     pub barycentrics: Vec<f32>,
+    _invalid: bool
 }
 
 impl Mesh {
+    pub const EMPTY: Self = Self {
+        vertices: vec![],
+        colors: vec![],
+        indices: vec![],
+        normals: vec![],
+        barycentrics: vec![],
+        _invalid: true
+    };
+
     pub fn bake_wireframe(&mut self, wire_type: WireType) {
         if wire_type == WireType::Triangle {
             return;
@@ -150,6 +201,10 @@ impl Mesh {
             return;
         }
         self.barycentrics = advanced_wire::calculate_barycentrics_quad(&self.vertices);
+    }
+
+    pub fn is_invalid(&self) -> bool {
+        self._invalid
     }
 }
 
@@ -185,7 +240,7 @@ pub struct SpecialUnis {
     pub cam_pos: Vec3,
 }
 
-pub trait ShaderInfo {
+pub trait ShaderInfo: Send + 'static {
     fn name(&self) -> &str;
     fn set_special_uniforms(&self, e: &SpecialUnis, shader: &InnerObjectShader);
 }
@@ -231,8 +286,7 @@ impl InnerObjectShader {
             GetShaderiv(vs, COMPILE_STATUS, &mut success as *mut c_int);
             if success == 0 {
                 GetShaderiv(vs, INFO_LOG_LENGTH, &mut success as *mut c_int);
-                let mut log: Vec<c_char> = Vec::with_capacity(success as usize);
-                log.set_len(success as usize);
+                let mut log: Vec<c_char> = vec![0; success as usize];
                 GetShaderInfoLog(vs, success, std::ptr::null_mut(), log.as_mut_ptr());
                 let msg = CStr::from_ptr(log.as_ptr())
                     .to_owned()
@@ -250,7 +304,7 @@ impl InnerObjectShader {
             GetShaderiv(fs, COMPILE_STATUS, &mut success as *mut c_int);
             if success == 0 {
                 GetShaderiv(vs, INFO_LOG_LENGTH, &mut success as *mut c_int);
-                let mut log: Vec<c_char> = Vec::with_capacity(success as usize);
+                let mut log: Vec<c_char> = vec![0; success as usize];
                 GetShaderInfoLog(vs, success, std::ptr::null_mut(), log.as_mut_ptr());
                 let msg = CStr::from_ptr(log.as_ptr())
                     .to_owned()
@@ -269,7 +323,7 @@ impl InnerObjectShader {
             GetProgramiv(prog, LINK_STATUS, &mut success as *mut c_int);
             if success == 0 {
                 GetProgramiv(prog, INFO_LOG_LENGTH, &mut success as *mut c_int);
-                let mut log: Vec<c_char> = Vec::with_capacity(success as usize);
+                let mut log: Vec<c_char> = vec![0; success as usize];
                 GetProgramInfoLog(prog, success, std::ptr::null_mut(), log.as_mut_ptr());
                 let msg = CStr::from_ptr(log.as_ptr())
                     .to_owned()

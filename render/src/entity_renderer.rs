@@ -37,7 +37,11 @@ impl Drop for EntityRenderer {
 }
 
 impl EntityRenderer {
-    pub fn init(mesh: Mesh) -> Self {
+    /// if the mesh given is invalid, it will not not even bother creating the renderer
+    pub fn init(mesh: Mesh) -> Option<Self> {
+        if mesh._invalid {
+            return None
+        }
         let mut instance = Self {
             mesh,
             vao: 0,
@@ -142,7 +146,7 @@ impl EntityRenderer {
             );
         }
 
-        instance
+        Some(instance)
     }
 
     pub fn draw(&self) {
