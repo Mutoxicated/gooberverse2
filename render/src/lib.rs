@@ -16,16 +16,14 @@ use std::{
 
 pub mod uniform {
     ///mat4
-    pub const PROJ:&str = "proj";
+    pub const PROJ: &str = "proj";
     ///mat4
-    pub const VIEW:&str = "view";
+    pub const VIEW: &str = "view";
     ///mat4
-    pub const MODEL:&str = "model";
+    pub const MODEL: &str = "model";
     ///float
-    pub const SCALE:&str = "scale";
-    
+    pub const SCALE: &str = "scale";
 }
-    
 
 #[derive(PartialEq)]
 pub enum WireType {
@@ -38,14 +36,14 @@ pub enum WireType {
 }
 
 /// A builder for building meshes.A
-/// 
+///
 /// The correct way to use it is like so:
 /// ```
 /// let mesh = MeshBuilder::builder(vec![-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 0.0])
 ///     .with_colors(vec![0.4, 0.0, 0.0, 1.0, 0.4, 0.0, 0.9, 1.0, 0.0, 1.0, 0.0, 1.0, 0.1, 0.3, 1.0, 1.0 ])
 ///     .with_indices(vec![0,1,2,3,0])
 ///     .build();
-/// 
+///
 /// // or like this
 /// let mesh = MeshBuilder::builder(vec![-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 0.0])
 ///     .with_indices(vec![0,1,2,3,0])
@@ -58,7 +56,7 @@ pub struct MeshBuilder {
     colors: Option<Vec<f32>>,
     indices: Option<Vec<c_uint>>,
     normals: Option<Vec<f32>>,
-    _invalid: bool
+    _invalid: bool,
 }
 
 impl MeshBuilder {
@@ -72,11 +70,9 @@ impl MeshBuilder {
         }
         a.vertices = Some(verts);
         a
-
     }
 
     pub fn with_colors(mut self, colors: Vec<f32>) -> Self {
-
         if colors.len() / 4 != self.vertices.as_ref().unwrap().len() / 3 {
             println!(
                 "Invalid mesh data. Amount of colors != Amount of vertices. (Maybe you didn't give the alpha channels?)"
@@ -87,7 +83,7 @@ impl MeshBuilder {
         self
     }
 
-    pub fn with_indices(mut self, mut indices: Vec<c_uint>) -> Self {
+    pub fn with_indices(mut self, indices: Vec<c_uint>) -> Self {
         if indices.len() < 3 {
             println!("Invalid mesh data. Indices must be more than 2 to form at least 1 triangle.");
             self._invalid = true;
@@ -163,22 +159,21 @@ impl MeshBuilder {
             indices: new_indices,
             normals: self.normals.unwrap(),
             barycentrics: [0.1, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1].repeat(new_verts_len / 3),
-            _invalid: self._invalid
+            _invalid: self._invalid,
         }
     }
 }
 
-
 /// A mesh.
 /// A color value is in the range [0, 1.0]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Mesh {
     pub vertices: Vec<f32>,
     pub colors: Vec<f32>,
     pub indices: Vec<c_uint>,
     pub normals: Vec<f32>,
     pub barycentrics: Vec<f32>,
-    _invalid: bool
+    _invalid: bool,
 }
 
 impl Mesh {
@@ -188,19 +183,20 @@ impl Mesh {
         indices: vec![],
         normals: vec![],
         barycentrics: vec![],
-        _invalid: true
+        _invalid: true,
     };
 
-    pub fn bake_wireframe(&mut self, wire_type: WireType) {
+    pub fn bake_wireframe(mut self, wire_type: WireType) -> Self {
         if wire_type == WireType::Triangle {
-            return;
+            return self;
         }
         if wire_type == WireType::Advanced {
             self.barycentrics =
                 advanced_wire::calculate_barycentrics_adv(&self.vertices, &self.normals);
-            return;
+            return self;
         }
         self.barycentrics = advanced_wire::calculate_barycentrics_quad(&self.vertices);
+        self
     }
 
     pub fn is_invalid(&self) -> bool {
@@ -382,6 +378,6 @@ impl InnerObjectShader {
 
 pub struct RenderObject {
     pub model_matrix: Mat4,
-    pub drawer: EntityRenderer,
+    pub entity_id: u64,
     pub shaders_to_use: Vec<u8>,
 }

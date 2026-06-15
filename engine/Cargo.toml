@@ -6,6 +6,6 @@ edition = "2024"
 [dependencies]
 gl = "0.14.0"
 glam = "0.30.9"
-glfw = "0.61.0"
+glfw = "0.62.0"
 ordered-float = "5.1.0"
 render = { path="../render/"}

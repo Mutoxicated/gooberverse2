@@ -6,12 +6,12 @@ mod renderer;
 mod transform;
 mod utils;
 
+pub use app::App;
 pub use game_state::GameState;
+pub use game_state::Input;
 pub use game_state::InternalEntity;
+
 use glam::Vec3;
-use glfw::ffi::GLFW_PLATFORM_NULL;
-use glfw::ffi::GLFWwindow;
-use glfw::ffi::glfwMakeContextCurrent;
 
 pub const FRONT: Vec3 = Vec3 {
     x: 0.0,
@@ -34,10 +34,7 @@ use glfw::{Context, Glfw, GlfwReceiver, PWindow, WindowEvent};
 use render::{ObjectShader, ShaderInfo};
 
 use crate::game_state::ToGameState;
-use crate::{
-    app::{App, ToApp},
-    renderer::{Renderer},
-};
+use crate::{app::ToApp, renderer::Renderer};
 
 /// Note: game_state does not include the custom entity itself (i.e. the `self`)
 pub trait CustomEntity: Send + 'static {
@@ -48,8 +45,8 @@ pub trait CustomEntity: Send + 'static {
         game_state: &mut GameState,
         fixed_dt: f32,
     );
-    fn mesh(&self) -> &render::Mesh;
-    fn shaders_to_use(&self) -> Vec<u8>;
+    fn mesh(&self) -> &'static render::Mesh;
+    fn shaders_to_use(&self) -> &'static Vec<u8>;
 }
 
 pub struct EngineBuilder {
@@ -58,6 +55,8 @@ pub struct EngineBuilder {
     shaders_path: String,
     shader_info: Option<Vec<Box<dyn ShaderInfo>>>,
     fixed_step_sec: u64,
+    app_callbacks: Option<&'static dyn AppCallbacks>,
+    game_callbacks: Option<&'static mut dyn GameCallbacks>,
 }
 
 impl EngineBuilder {
@@ -124,6 +123,8 @@ impl EngineBuilder {
             shaders_path: String::new(),
             shader_info: None,
             fixed_step_sec: 100,
+            app_callbacks: None,
+            game_callbacks: None,
         }
     }
 
@@ -143,6 +144,16 @@ impl EngineBuilder {
         self
     }
 
+    pub fn game_callbacks(mut self, game_calllbacks: &'static mut dyn GameCallbacks) -> Self {
+        self.game_callbacks = game_calllbacks.into();
+        self
+    }
+
+    pub fn app_callbacks(mut self, app_callbacks: &'static dyn AppCallbacks) -> Self {
+        self.app_callbacks = app_callbacks.into();
+        self
+    }
+
     pub fn with_fixed_timestep(mut self, timestep_sec: u64) -> Self {
         self.fixed_step_sec = timestep_sec;
         self
@@ -153,6 +164,8 @@ impl EngineBuilder {
         assert_ne!(self.height, 0);
         assert_ne!(self.shaders_path, "".to_owned());
         assert!(self.shader_info.is_some());
+        assert!(self.game_callbacks.is_some());
+        assert!(self.app_callbacks.is_some());
 
         let mut glfw = Self::glfw_constructor();
         let (window, events) = Self::window_event_constructor(&mut glfw, self.width, self.height);
@@ -161,33 +174,50 @@ impl EngineBuilder {
             obj_shaders.push(ObjectShader::new(v, self.shaders_path.to_owned()));
         }
 
-        let (sender, r) = std::sync::mpsc::channel::<ToGameState>();        
+        let (sender, r) = std::sync::mpsc::channel::<ToGameState>();
         let (sender2, r2) = std::sync::mpsc::channel::<ToApp>();
-        let sender2_copy = sender2.clone();
 
-        let renderer = Renderer::new(obj_shaders, sender2);
+        let renderer = Renderer::new(obj_shaders);
         let app = App {
             glfw,
             window,
             events,
             renderer,
             inbox: r2,
-            to_game_state: sender
+            to_game_state: sender,
         };
-        let game_state = GameState::new(self.fixed_step_sec, sender2_copy, r);
+        let game_state = GameState::new(self.fixed_step_sec, sender2, r);
 
-        Engine { app, game_state }
+        Engine {
+            app,
+            game_state,
+            app_callbacks: self.app_callbacks.unwrap(),
+            game_callbacks: self.game_callbacks.unwrap(),
+        }
     }
+}
+
+pub trait GameCallbacks: Send + Sync + 'static {
+    fn start(&mut self, game: &mut GameState);
+    fn update(&mut self, game: &mut GameState);
+    fn input(&mut self, game: &mut GameState, input: &Input);
+}
+
+pub trait AppCallbacks {
+    fn start(&self, app: &mut App);
+    fn update(&self, app: &mut App);
 }
 
 pub struct Engine {
     pub app: App,
-    pub game_state: GameState
+    game_state: GameState,
+    game_callbacks: &'static mut dyn GameCallbacks,
+    app_callbacks: &'static dyn AppCallbacks,
 }
 
 impl Engine {
-    pub fn run(self, func: impl FnMut(&mut App)) {
-        self.game_state.start_runtime();
-        self.app.start_runtime(func);
+    pub fn run(self) {
+        self.game_state.start_runtime(self.game_callbacks);
+        self.app.start_runtime(self.app_callbacks);
     }
 }

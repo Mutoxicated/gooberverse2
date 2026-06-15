@@ -13,7 +13,7 @@ use {
 
 #[derive(Clone)]
 pub struct EntityRenderer {
-    mesh: Mesh,
+    indices: Vec<c_uint>,
 
     vao: c_uint,
     vbo_v: c_uint,
@@ -38,12 +38,10 @@ impl Drop for EntityRenderer {
 
 impl EntityRenderer {
     /// if the mesh given is invalid, it will not not even bother creating the renderer
-    pub fn init(mesh: Mesh) -> Option<Self> {
-        if mesh._invalid {
-            return None
-        }
+    pub fn init(mesh: &Mesh) -> Self {
+        assert!(!mesh._invalid);
         let mut instance = Self {
-            mesh,
+            indices: mesh.indices.clone(),
             vao: 0,
             vbo_v: 0,
             vbo_c: 0,
@@ -52,11 +50,11 @@ impl EntityRenderer {
             ebo: 0,
         };
 
-        let verts = instance.mesh.vertices.as_slice();
-        let colors = instance.mesh.colors.as_slice();
-        let indices = instance.mesh.indices.as_slice();
-        let normals = instance.mesh.normals.as_slice();
-        let barys = instance.mesh.barycentrics.as_slice();
+        let verts = mesh.vertices.as_slice();
+        let colors = mesh.colors.as_slice();
+        let indices = instance.indices.as_slice();
+        let normals = mesh.normals.as_slice();
+        let barys = mesh.barycentrics.as_slice();
 
         unsafe {
             GenBuffers(1, &mut instance.vbo_v as *mut c_uint);
@@ -146,7 +144,7 @@ impl EntityRenderer {
             );
         }
 
-        Some(instance)
+        instance
     }
 
     pub fn draw(&self) {
@@ -154,7 +152,7 @@ impl EntityRenderer {
             BindVertexArray(self.vao);
             DrawElements(
                 TRIANGLES,
-                self.mesh.indices.len() as c_int,
+                self.indices.len() as c_int,
                 UNSIGNED_INT,
                 std::ptr::null(),
             );
