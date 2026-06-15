@@ -55,6 +55,7 @@ impl App {
             match event {
                 FramebufferSize(w, h) => unsafe {
                     gl::Viewport(0, 0, w, h);
+                    let _ = self.to_game_state.send(ScreenResize(w, h));
                 },
                 Key(glfw::Key::Escape, _, Action::Press, _) => {
                     self.window.set_should_close(true);
