@@ -59,14 +59,15 @@ impl Renderer {
             cam_pos: camera.pos,
         };
         for obj in objs.iter() {
+            if !self.entity_renderers.contains_key(&obj.entity_id) {
+                continue;
+            }
             for shader_index in &obj.shaders_to_use {
                 let os = &self.shaders[*shader_index as usize];
                 os.shader.activate();
                 os.shader.set_mat4(MODEL, obj.model_matrix);
                 os.info.set_special_uniforms(&special_unis, &os.shader);
-                if self.entity_renderers.contains_key(&obj.entity_id) {
-                    self.entity_renderers[&obj.entity_id].draw();
-                }
+                self.entity_renderers[&obj.entity_id].draw();
             }
         }
         get_gl_error!();

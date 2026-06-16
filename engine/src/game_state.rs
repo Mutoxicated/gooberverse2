@@ -79,7 +79,7 @@ impl GameState {
             // game thread
             callbacks.start(&mut self);
             loop {
-                //thread::sleep(Duration::from_millis(self.fixed_timestep));
+                thread::sleep(Duration::from_millis(self.fixed_timestep));
                 let msgs: Vec<ToGameState> = self.inbox.try_iter().collect();
                 for msg in msgs {
                     if let ToGameState::InputMessage(i) = msg {

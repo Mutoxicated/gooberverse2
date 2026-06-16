@@ -108,7 +108,7 @@ impl GameCallbacks for Game {
 
     fn update(&mut self, state: &mut GameState) {
         self.timer += 1;
-        if self.timer % 72 == 0 {
+        if self.timer % 32 == 0 {
             state.new_entity(Cube::default());
         }
     }
