@@ -6,6 +6,8 @@ mod renderer;
 mod transform;
 mod utils;
 
+use std::rc::Rc;
+
 pub use app::App;
 pub use game_state::GameState;
 pub use game_state::Input;

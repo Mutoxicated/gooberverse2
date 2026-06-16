@@ -1,3 +1,5 @@
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use engine::{
     AppCallbacks, CustomEntity, EngineBuilder, GameCallbacks, GameState,
     Input::{self, CursorPos},
@@ -30,6 +32,7 @@ impl ShaderInfo for BaseShader {
     }
 }
 
+#[derive(Default)]
 struct Cube {
     timer: f32,
 }
@@ -75,9 +78,13 @@ impl CustomEntity for Cube {
         i.transform.set_position(Vec3::new(20.0, 0.0, 10.0));
     }
 
-    fn fixed_update(&mut self, a: &mut InternalEntity, _: &mut GameState, dt: f32) {
+    fn fixed_update(&mut self, a: &mut InternalEntity, state: &mut GameState, dt: f32) {
         //a.transform.add_position(4.0 * engine::FRONT * dt);
         self.timer += dt;
+        a.transform.add_position(engine::FRONT*dt);
+        if self.timer >= 3.2 {
+            state.kill_entity(a);
+        }
     }
 
     fn mesh(&self) -> &'static render::Mesh {
@@ -92,21 +99,26 @@ impl CustomEntity for Cube {
 #[derive(Default)]
 pub struct Game {
     prev_mouse_pos: DVec2,
+    timer: i32
 }
 impl GameCallbacks for Game {
     fn start(&mut self, state: &mut GameState) {
-        state.new_entity(Cube { timer: 0f32 });
+        state.new_entity(Cube::default());
     }
 
-    fn update(&mut self, _: &mut GameState) {}
+    fn update(&mut self, state: &mut GameState) {
+        self.timer += 1;
+        if self.timer % 72 == 0 {
+            state.new_entity(Cube::default());
+        }
+    }
 
     fn input(&mut self, state: &mut GameState, input: &Input) {
         match *input {
             Input::Key(glfw::Key::Tab, glfw::Action::Press, _) => {
-                
             }
             CursorPos(x, y) => {
-                println!("[GameState] CursorPos");
+                //println!("[GameState] CursorPos");
                 let new_mouse_position = DVec2::new(x, y);
                 if self.prev_mouse_pos == DVec2::splat(-1.0) {
                     self.prev_mouse_pos = new_mouse_position;
@@ -119,13 +131,15 @@ impl GameCallbacks for Game {
                 let sens = 8.0;
                 dx *= state.fixed_dt() * sens;
                 dy *= state.fixed_dt() * sens;
-                state.camera.yaw += dx;
-                state.camera.pitch = (state.camera.pitch - dy).clamp(-89.0, 89.0);
+                
+                let cam = &mut state.camera;
+                cam.yaw += dx;
+                cam.pitch = (cam.pitch - dy).clamp(-89.0, 89.0);
 
-                let yaw_rad = state.camera.yaw.to_radians();
-                let pitch_rad = state.camera.pitch.to_radians();
+                let yaw_rad = cam.yaw.to_radians();
+                let pitch_rad = cam.pitch.to_radians();
 
-                state.camera.front = Vec3 {
+                cam.front = Vec3 {
                     x: yaw_rad.cos() * pitch_rad.cos(),
                     y: pitch_rad.sin(),
                     z: yaw_rad.sin() * pitch_rad.cos(),
@@ -137,10 +151,6 @@ impl GameCallbacks for Game {
     }
 }
 
-pub static mut GAME: Game = Game {
-    prev_mouse_pos: DVec2 { x: -1.0, y: -1.0 },
-};
-
 pub struct App;
 impl AppCallbacks for App {
     fn start(&self, app: &mut engine::App) {
@@ -151,11 +161,16 @@ impl AppCallbacks for App {
         //     }
         // });
     }
-
+    
     fn update(&self, _: &mut engine::App) {
         
     }
 }
+
+pub static mut GAME: Game = Game {
+    prev_mouse_pos: DVec2 { x: -1.0, y: -1.0 },
+    timer: 0i32
+};
 
 fn main() {
     #[allow(static_mut_refs)]
@@ -165,7 +180,7 @@ fn main() {
             "/home/mutoxicated/Desktop/Software/gooberverse2/test-game/resources/shaders/",
         )
         .shader_info(vec![Box::new(WireShader {}), Box::new(BaseShader {})])
-        .with_fixed_timestep(50)
+        .with_fixed_timestep(10)
         .app_callbacks(&App)
         .game_callbacks(unsafe { &mut GAME })
         .build();

@@ -1,13 +1,12 @@
 use std::{
-    sync::mpsc::{Receiver, Sender},
+    sync::{Arc, RwLock, mpsc::{Receiver, Sender}},
     thread,
     time::Duration,
 };
 
 use crate::{
-    CustomEntity, GameCallbacks, app::ToApp::{self, CreateEntityRenderer, RemoveEntityRenderer, StartRender}, camera::Camera, game_state::ToGameState::{InputMessage, ScreenResize}, renderer::Batch, transform::Transform
+    CustomEntity, GameCallbacks, app::ToApp::{self, CreateEntityRenderer, RemoveEntityRenderer, StartRender}, camera::Camera, renderer::Batch, transform::Transform
 };
-use glfw::Key;
 use render::RenderObject;
 
 pub struct InternalEntity {
@@ -80,22 +79,21 @@ impl GameState {
             // game thread
             callbacks.start(&mut self);
             loop {
-                thread::sleep(Duration::from_millis(self.fixed_timestep));
-
+                //thread::sleep(Duration::from_millis(self.fixed_timestep));
                 let msgs: Vec<ToGameState> = self.inbox.try_iter().collect();
                 for msg in msgs {
-                    if let InputMessage(i) = msg {
+                    if let ToGameState::InputMessage(i) = msg {
                         callbacks.input(&mut self, &i);
                     }else {
                         self.hanlde_msg(&msg);
                     }
                 }
-
                 callbacks.update(&mut self);
+                
                 let robjs = self.fixed_update();
                 let res = self
                     .to_app
-                    .send(StartRender(Batch::new(robjs, self.camera.clone())));
+                    .send(StartRender(Batch::new(robjs, self.camera.render_info())));
                 if res.is_err() {
                     break;
                 }
@@ -107,37 +105,29 @@ impl GameState {
         (self.fixed_timestep as f32) / 1000.0
     }
 
-    fn fixed_update(&mut self) -> Vec<RenderObject> {
+    fn fixed_update(&mut self) -> Arc<[RenderObject]> {
         let entities_len = self.entities.len();
 
+        let dt = self.fixed_dt();
         let mut robjs = Vec::<RenderObject>::with_capacity(entities_len);
-        let mut i = entities_len as isize - 1;
-        while i >= 0 {
-            let a = self.entities.pop();
-            if a.is_none() {
-                i -= 1;
+        let entities: Vec<_> = self.entities.drain(..).collect();
+        for mut e in entities {
+            e.custom.fixed_update(&mut e.internal, self, dt);
+            if e.internal.is_dead {
                 continue;
             }
-            let mut a = a.unwrap();
-            a.custom
-                .fixed_update(&mut a.internal, self, self.fixed_dt());
-            if a.internal.is_dead {
-                i -= 1;
-                continue;
+            if !e.custom.mesh().is_invalid() {
+                robjs.push(e.get_render_object());
             }
-            if !a.custom.mesh().is_invalid() {
-                robjs.push(a.get_render_object());
-            }
-            self.entities.push(a);
-            i -= 1;
+            self.entities.push(e);
         }
-        robjs
+        robjs.into()
     }
 
     fn hanlde_msg(&mut self, msg: &ToGameState) {
-        use ToGameState::*;
+        use ToGameState as T;
         match *msg {
-            ScreenResize(x, y) => {
+            T::ScreenResize(x, y) => {
                 self.camera.screen_size = (x, y);
             }
             _ => {}

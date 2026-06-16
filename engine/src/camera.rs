@@ -1,6 +1,6 @@
 use glam::{Mat4, Vec3};
 
-use crate::WORLD_SCALE;
+use crate::{WORLD_SCALE, renderer::CameraRenderInfo};
 
 #[derive(Clone)]
 pub struct Camera {
@@ -41,5 +41,13 @@ impl Camera {
     pub fn proj_matrix(&self) -> Mat4 {
         let screen_ratio = self.screen_size.0 as f32 / self.screen_size.1 as f32;
         Mat4::perspective_rh(self.fov.to_radians(), screen_ratio, self.z_near, self.z_far)
+    }
+
+    pub fn render_info(&self) -> CameraRenderInfo {
+        CameraRenderInfo { 
+            proj_mat: self.proj_matrix(),
+            view_mat: self.view_matrix(),
+            pos: self.position
+        }
     }
 }
