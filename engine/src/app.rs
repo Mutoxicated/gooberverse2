@@ -61,9 +61,6 @@ impl App {
                     };
                     self.window.set_cursor_mode(mode);
                 }
-                W::Key(a, _, b, c) => {
-                    let _ = self.to_game_state.send(InputMessage(Input::Key(a, b, c)));
-                }
                 W::Scroll(_, dy) => {
                     let _ = self.to_game_state.send(InputMessage(Input::Scroll(dy)));
                 }
@@ -110,5 +107,9 @@ impl App {
         unsafe {
             gl::ClearColor(r, g, b, 1.0);
         }
+    }
+
+    pub fn send_to_game_state(&mut self, t: ToGameState) {
+        let _ = self.to_game_state.send(t);
     }
 }

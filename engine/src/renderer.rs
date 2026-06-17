@@ -7,12 +7,14 @@ use render::{EntityRenderer, Mesh, ObjectShader, RenderObject};
 
 use crate::{WORLD_SCALE, get_gl_error};
 
+#[derive(Clone)]
 pub(crate) struct CameraRenderInfo {
     pub(crate) proj_mat: Mat4,
     pub(crate) view_mat: Mat4,
     pub(crate) pos: Vec3
 }
 
+#[derive(Clone)]
 pub struct Batch {
     pub objs: Arc<[RenderObject]>,
     pub camera: CameraRenderInfo,
@@ -30,13 +32,15 @@ impl Batch {
 pub struct Renderer {
     pub shaders: Vec<ObjectShader>,
     entity_renderers: HashMap<u64, EntityRenderer>,
+    _fixed_timestep: f32
 }
 
 impl Renderer {
-    pub fn new(shaders: Vec<ObjectShader>) -> Self {
+    pub fn new(shaders: Vec<ObjectShader>, game_fixed_timestep: f32) -> Self {
         Self {
             shaders,
             entity_renderers: HashMap::new(),
+            _fixed_timestep: game_fixed_timestep,
         }
     }
 

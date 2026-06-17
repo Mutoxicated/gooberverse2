@@ -1,11 +1,10 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use engine::{
-    AppCallbacks, CustomEntity, EngineBuilder, GameCallbacks, GameState,
-    Input::{self, CursorPos},
-    InternalEntity, WORLD_AMBIENCE, WORLD_SCALE,
+    AppCallbacks, Camera, CustomEntity, EngineBuilder, GameCallbacks, GameState, Input::{self, CursorPos}, InternalEntity, WORLD_AMBIENCE, WORLD_SCALE
 };
 use glam::{DVec2, Vec3};
+use glfw::Action;
 use lazy_static::lazy_static;
 use render::{InnerObjectShader, MeshBuilder, ShaderInfo, SpecialUnis};
 
@@ -99,7 +98,8 @@ impl CustomEntity for Cube {
 #[derive(Default)]
 pub struct Game {
     prev_mouse_pos: DVec2,
-    timer: i32
+    timer: i32,
+    cam_speed: f32
 }
 impl GameCallbacks for Game {
     fn start(&mut self, state: &mut GameState) {
@@ -115,7 +115,17 @@ impl GameCallbacks for Game {
 
     fn input(&mut self, state: &mut GameState, input: &Input) {
         match *input {
-            Input::Key(glfw::Key::Tab, glfw::Action::Press, _) => {
+            Input::Key(glfw::Key::W, glfw::Action::Repeat, _) => {
+                state.camera.position += state.camera.front*self.cam_speed*state.fixed_dt();
+            }
+            Input::Key(glfw::Key::S, glfw::Action::Repeat, _) => {
+                state.camera.position -= state.camera.front*self.cam_speed*state.fixed_dt();
+            }
+            Input::Key(glfw::Key::A, glfw::Action::Repeat, _) => {
+                state.camera.position -= state.camera.front.cross(Camera::UP).normalize()*self.cam_speed*state.fixed_dt();
+            }
+            Input::Key(glfw::Key::D, glfw::Action::Repeat, _) => {
+                state.camera.position += state.camera.front.cross(Camera::UP).normalize()*self.cam_speed*state.fixed_dt();
             }
             CursorPos(x, y) => {
                 //println!("[GameState] CursorPos");
@@ -153,23 +163,27 @@ impl GameCallbacks for Game {
 
 pub struct App;
 impl AppCallbacks for App {
-    fn start(&self, app: &mut engine::App) {
-        // app.window_mut().set_key_callback(|w, k, _, a, _| {
-        //     if k == glfw::Key::Tab && a == glfw::Action::Press {
-        //         let mode = if w.get_cursor_mode() == Disabled { Normal } else { Disabled };
-        //         w.set_cursor_mode(mode);
-        //     }
-        // });
+    fn start(&self, _app: &mut engine::App) {
+        
     }
     
-    fn update(&self, _: &mut engine::App) {
-        
+    fn update(&self, app: &mut engine::App) {
+        if app.window().get_key(glfw::Key::W) == Action::Press {
+            app.send_to_game_state(engine::ToGameState::InputMessage(Input::Key(glfw::Key::W, glfw::Action::Repeat, glfw::Modifiers::empty())));
+        }else if app.window().get_key(glfw::Key::S) == Action::Press {
+            app.send_to_game_state(engine::ToGameState::InputMessage(Input::Key(glfw::Key::S, glfw::Action::Repeat, glfw::Modifiers::empty())));
+        }else if app.window().get_key(glfw::Key::A) == Action::Press {
+            app.send_to_game_state(engine::ToGameState::InputMessage(Input::Key(glfw::Key::A, glfw::Action::Repeat, glfw::Modifiers::empty())));
+        }else if app.window().get_key(glfw::Key::D) == Action::Press {
+            app.send_to_game_state(engine::ToGameState::InputMessage(Input::Key(glfw::Key::D, glfw::Action::Repeat, glfw::Modifiers::empty())));
+        }
     }
 }
 
 pub static mut GAME: Game = Game {
     prev_mouse_pos: DVec2 { x: -1.0, y: -1.0 },
-    timer: 0i32
+    timer: 0i32,
+    cam_speed: 0.4
 };
 
 fn main() {
@@ -180,7 +194,7 @@ fn main() {
             "/home/mutoxicated/Desktop/Software/gooberverse2/test-game/resources/shaders/",
         )
         .shader_info(vec![Box::new(WireShader {}), Box::new(BaseShader {})])
-        .with_fixed_timestep(10)
+        .with_fixed_timestep(17)
         .app_callbacks(&App)
         .game_callbacks(unsafe { &mut GAME })
         .build();

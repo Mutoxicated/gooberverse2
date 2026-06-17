@@ -1,5 +1,5 @@
 use std::{
-    sync::{Arc, RwLock, mpsc::{Receiver, Sender}},
+    sync::{Arc, mpsc::{Receiver, Sender}},
     thread,
     time::Duration,
 };
@@ -51,8 +51,9 @@ pub struct GameState {
     pub(crate) entities: Vec<Entity>,
     pub camera: Camera,
     uid_incrementer: u64,
-    /// fixed timestep in seconds
+    /// fixed timestep in millis
     fixed_timestep: u64,
+    fixed_delta_time: f32,
     to_app: Sender<ToApp>,
     inbox: Receiver<ToGameState>,
 }
@@ -69,6 +70,7 @@ impl GameState {
             camera: Camera::default(),
             uid_incrementer: 0,
             fixed_timestep,
+            fixed_delta_time: (fixed_timestep as f32)/1000.0,
             to_app,
             inbox,
         }
@@ -102,7 +104,7 @@ impl GameState {
     }
 
     pub fn fixed_dt(&self) -> f32 {
-        (self.fixed_timestep as f32) / 1000.0
+        self.fixed_delta_time
     }
 
     fn fixed_update(&mut self) -> Arc<[RenderObject]> {

@@ -1,17 +1,17 @@
 mod app;
 mod camera;
 mod constants;
-mod game_state;
+pub mod game_state;
 mod renderer;
 mod transform;
 mod utils;
-
-use std::rc::Rc;
 
 pub use app::App;
 pub use game_state::GameState;
 pub use game_state::Input;
 pub use game_state::InternalEntity;
+pub use game_state::ToGameState;
+pub use camera::Camera;
 
 use glam::Vec3;
 
@@ -35,7 +35,6 @@ use gl::{BLEND, DEPTH_TEST, MULTISAMPLE, ONE_MINUS_SRC_ALPHA, SRC_ALPHA};
 use glfw::{Context, Glfw, GlfwReceiver, PWindow, WindowEvent};
 use render::{ObjectShader, ShaderInfo};
 
-use crate::game_state::ToGameState;
 use crate::{app::ToApp, renderer::Renderer};
 
 /// Note: game_state does not include the custom entity itself (i.e. the `self`)
@@ -56,7 +55,7 @@ pub struct EngineBuilder {
     height: u32,
     shaders_path: String,
     shader_info: Option<Vec<Box<dyn ShaderInfo>>>,
-    fixed_step_sec: u64,
+    fixed_step_millis: u64,
     app_callbacks: Option<&'static dyn AppCallbacks>,
     game_callbacks: Option<&'static mut dyn GameCallbacks>,
 }
@@ -124,7 +123,7 @@ impl EngineBuilder {
             height: 0,
             shaders_path: String::new(),
             shader_info: None,
-            fixed_step_sec: 100,
+            fixed_step_millis: 100,
             app_callbacks: None,
             game_callbacks: None,
         }
@@ -157,7 +156,7 @@ impl EngineBuilder {
     }
 
     pub fn with_fixed_timestep(mut self, timestep_sec: u64) -> Self {
-        self.fixed_step_sec = timestep_sec;
+        self.fixed_step_millis = timestep_sec;
         self
     }
 
@@ -179,7 +178,7 @@ impl EngineBuilder {
         let (sender, r) = std::sync::mpsc::channel::<ToGameState>();
         let (sender2, r2) = std::sync::mpsc::channel::<ToApp>();
 
-        let renderer = Renderer::new(obj_shaders);
+        let renderer = Renderer::new(obj_shaders, (self.fixed_step_millis as f32)/1000.0);
         let app = App {
             glfw,
             window,
@@ -188,7 +187,7 @@ impl EngineBuilder {
             inbox: r2,
             to_game_state: sender,
         };
-        let game_state = GameState::new(self.fixed_step_sec, sender2, r);
+        let game_state = GameState::new(self.fixed_step_millis, sender2, r);
 
         Engine {
             app,
