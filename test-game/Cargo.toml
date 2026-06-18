@@ -8,4 +8,4 @@ engine = {path="../engine"}
 render = {path="../render"}
 glam = "0.30.9"
 lazy_static = "1.5.0"
-glfw = "0.62.0"
+glfw = {workspace = true}
