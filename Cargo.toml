@@ -3,4 +3,4 @@ members = [ "engine", "render", "test-game", "math"]
 resolver = "3"
 
 [workspace.dependencies]
-glfw = { version = "0.62.0", default-features = false }
+glfw = { version = "0.62.0", default-features = false, features = ["x11", "raw-window-handle-v0-6"] }
