@@ -190,9 +190,6 @@ fn main() {
     #[allow(static_mut_refs)]
     let engine = EngineBuilder::builder()
         .res(1000, 1000)
-        .shaders_path(
-            "/home/mutoxicated/Desktop/Software/gooberverse2/test-game/resources/shaders/",
-        )
         .shader_info(vec![Box::new(WireShader {}), Box::new(BaseShader {})])
         .with_fixed_timestep(17)
         .app_callbacks(&App)

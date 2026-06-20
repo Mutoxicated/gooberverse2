@@ -6,6 +6,9 @@ mod renderer;
 mod transform;
 mod utils;
 
+use std::rc::Rc;
+use std::sync::Arc;
+
 pub use app::App;
 pub use game_state::GameState;
 pub use game_state::Input;
@@ -50,10 +53,12 @@ pub trait CustomEntity: Send + 'static {
     fn shaders_to_use(&self) -> &'static Vec<u8>;
 }
 
+pub const SHADERS_PATH: &str = "./assets/shaders/";
+pub const MESHES_PATH: &str = "./assets/meshes/";
+
 pub struct EngineBuilder {
     width: u32,
     height: u32,
-    shaders_path: String,
     shader_info: Option<Vec<Box<dyn ShaderInfo>>>,
     fixed_step_millis: u64,
     app_callbacks: Option<&'static dyn AppCallbacks>,
@@ -121,7 +126,6 @@ impl EngineBuilder {
         Self {
             width: 0,
             height: 0,
-            shaders_path: String::new(),
             shader_info: None,
             fixed_step_millis: 100,
             app_callbacks: None,
@@ -132,11 +136,6 @@ impl EngineBuilder {
     pub fn res(mut self, w: u32, h: u32) -> Self {
         self.width = w;
         self.height = h;
-        self
-    }
-
-    pub fn shaders_path(mut self, v: &str) -> Self {
-        self.shaders_path = v.to_owned();
         self
     }
 
@@ -163,7 +162,6 @@ impl EngineBuilder {
     pub fn build(self) -> Engine {
         assert_ne!(self.width, 0);
         assert_ne!(self.height, 0);
-        assert_ne!(self.shaders_path, "".to_owned());
         assert!(self.shader_info.is_some());
         assert!(self.game_callbacks.is_some());
         assert!(self.app_callbacks.is_some());
@@ -172,7 +170,7 @@ impl EngineBuilder {
         let (window, events) = Self::window_event_constructor(&mut glfw, self.width, self.height);
         let mut obj_shaders: Vec<ObjectShader> = Vec::new();
         for v in self.shader_info.unwrap() {
-            obj_shaders.push(ObjectShader::new(v, self.shaders_path.to_owned()));
+            obj_shaders.push(ObjectShader::new(v, SHADERS_PATH.to_owned()));
         }
 
         let (sender, r) = std::sync::mpsc::channel::<ToGameState>();
