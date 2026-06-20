@@ -1,12 +1,20 @@
 use std::{
-    sync::{Arc, mpsc::{Receiver, Sender}},
+    sync::{
+        Arc,
+        mpsc::{Receiver, Sender},
+    },
     thread,
     time::Duration,
 };
 
 use crate::{
-    CustomEntity, GameCallbacks, app::ToApp::{self, CreateEntityRenderer, RemoveEntityRenderer, StartRender}, camera::Camera, renderer::Batch, transform::Transform
+    CustomEntity, GameCallbacks,
+    app::ToApp::{self, CreateEntityRenderer, InputRequest, RemoveEntityRenderer, StartRender},
+    camera::Camera,
+    renderer::Batch,
+    transform::Transform,
 };
+use ordered_float::OrderedFloat;
 use render::RenderObject;
 
 pub struct InternalEntity {
@@ -36,15 +44,17 @@ impl Entity {
     }
 }
 
+#[derive(Debug)]
 pub enum ToGameState {
     InputMessage(Input),
-    ScreenResize(i32, i32)
+    ScreenResize(i32, i32),
 }
 
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub enum Input {
     Key(glfw::Key, glfw::Action, glfw::Modifiers),
-    Scroll(f64),
-    CursorPos(f64, f64),
+    Scroll(OrderedFloat<f64>),
+    CursorPos(OrderedFloat<f64>, OrderedFloat<f64>),
 }
 
 pub struct GameState {
@@ -70,7 +80,7 @@ impl GameState {
             camera: Camera::default(),
             uid_incrementer: 0,
             fixed_timestep,
-            fixed_delta_time: (fixed_timestep as f32)/1000.0,
+            fixed_delta_time: (fixed_timestep as f32) / 1000.0,
             to_app,
             inbox,
         }
@@ -82,16 +92,17 @@ impl GameState {
             callbacks.start(&mut self);
             loop {
                 thread::sleep(Duration::from_millis(self.fixed_timestep));
+                let _ = self.to_app.send(InputRequest());
                 let msgs: Vec<ToGameState> = self.inbox.try_iter().collect();
                 for msg in msgs {
                     if let ToGameState::InputMessage(i) = msg {
                         callbacks.input(&mut self, &i);
-                    }else {
+                    } else {
                         self.hanlde_msg(&msg);
                     }
                 }
                 callbacks.update(&mut self);
-                
+
                 let robjs = self.fixed_update();
                 let res = self
                     .to_app

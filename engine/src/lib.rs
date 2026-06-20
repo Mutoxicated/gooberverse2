@@ -6,15 +6,12 @@ mod renderer;
 mod transform;
 mod utils;
 
-use std::rc::Rc;
-use std::sync::Arc;
-
 pub use app::App;
+pub use camera::Camera;
 pub use game_state::GameState;
 pub use game_state::Input;
 pub use game_state::InternalEntity;
 pub use game_state::ToGameState;
-pub use camera::Camera;
 
 use glam::Vec3;
 
@@ -38,9 +35,10 @@ use gl::{BLEND, DEPTH_TEST, MULTISAMPLE, ONE_MINUS_SRC_ALPHA, SRC_ALPHA};
 use glfw::{Context, Glfw, GlfwReceiver, PWindow, WindowEvent};
 use render::{ObjectShader, ShaderInfo};
 
+use crate::app::AppBuilder;
 use crate::{app::ToApp, renderer::Renderer};
 
-/// Note: game_state does not include the custom entity itself (i.e. the `self`)
+/// Note for the `start` and `fixed_update` methods: game_state does not include the custom entity itself (i.e. the `self`)
 pub trait CustomEntity: Send + 'static {
     fn start(&mut self, inner: &mut InternalEntity, game_state: &mut GameState);
     fn fixed_update(
@@ -176,15 +174,13 @@ impl EngineBuilder {
         let (sender, r) = std::sync::mpsc::channel::<ToGameState>();
         let (sender2, r2) = std::sync::mpsc::channel::<ToApp>();
 
-        let renderer = Renderer::new(obj_shaders, (self.fixed_step_millis as f32)/1000.0);
-        let app = App {
-            glfw,
-            window,
-            events,
-            renderer,
-            inbox: r2,
-            to_game_state: sender,
-        };
+        let renderer = Renderer::new(obj_shaders, (self.fixed_step_millis as f32) / 1000.0);
+        let app = AppBuilder::builder()
+            .glfw_window_events(glfw, window, events)
+            .renderer(renderer)
+            .inbox(r2)
+            .to_game_state(sender)
+            .build();
         let game_state = GameState::new(self.fixed_step_millis, sender2, r);
 
         Engine {

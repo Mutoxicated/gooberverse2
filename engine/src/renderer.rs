@@ -1,4 +1,3 @@
-
 use std::{collections::HashMap, sync::Arc};
 
 use gl::{COLOR_BUFFER_BIT, DEPTH_BUFFER_BIT};
@@ -8,10 +7,10 @@ use render::{EntityRenderer, Mesh, ObjectShader, RenderObject};
 use crate::{WORLD_SCALE, get_gl_error};
 
 #[derive(Clone)]
-pub(crate) struct CameraRenderInfo {
-    pub(crate) proj_mat: Mat4,
-    pub(crate) view_mat: Mat4,
-    pub(crate) pos: Vec3
+pub struct CameraRenderInfo {
+    pub proj_mat: Mat4,
+    pub view_mat: Mat4,
+    pub pos: Vec3,
 }
 
 #[derive(Clone)]
@@ -32,7 +31,7 @@ impl Batch {
 pub struct Renderer {
     pub shaders: Vec<ObjectShader>,
     entity_renderers: HashMap<u64, EntityRenderer>,
-    _fixed_timestep: f32
+    _fixed_timestep: f32,
 }
 
 impl Renderer {

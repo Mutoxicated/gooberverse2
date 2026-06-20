@@ -1,7 +1,9 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use engine::{
-    AppCallbacks, Camera, CustomEntity, EngineBuilder, GameCallbacks, GameState, Input::{self, CursorPos}, InternalEntity, WORLD_AMBIENCE, WORLD_SCALE
+    AppCallbacks, Camera, CustomEntity, EngineBuilder, GameCallbacks, GameState,
+    Input::{self, CursorPos},
+    InternalEntity, WORLD_AMBIENCE, WORLD_SCALE,
 };
 use glam::{DVec2, Vec3};
 use glfw::Action;
@@ -38,24 +40,24 @@ struct Cube {
 
 lazy_static! {
     static ref CUBE_MESH: render::Mesh = MeshBuilder::builder(vec![
-            -5.0, -5.0, -5.0, 
-            5.0, -5.0, -5.0, 
-            5.0, 5.0, -5.0, 
-            -5.0, 5.0, -5.0, 
+            -5.0, -5.0, -5.0,
+            5.0, -5.0, -5.0,
+            5.0, 5.0, -5.0,
+            -5.0, 5.0, -5.0,
 
             -5.0, -5.0, 5.0,
-            5.0, -5.0, 5.0, 
-            5.0, 5.0, 5.0, 
+            5.0, -5.0, 5.0,
+            5.0, 5.0, 5.0,
             -5.0, 5.0, 5.0,
         ])
         .with_colors(vec![
-            1.0, 0.0, 0.0, 1.0, 
-            0.0, 1.0, 0.0, 1.0, 
-            0.0, 0.0, 1.0, 1.0, 
-            1.0, 1.0, 0.0, 1.0, 
-            1.0, 0.0, 1.0, 1.0, 
-            0.0, 1.0, 1.0, 1.0, 
-            0.0, 1.0, 1.0, 1.0, 
+            1.0, 0.0, 0.0, 1.0,
+            0.0, 1.0, 0.0, 1.0,
+            0.0, 0.0, 1.0, 1.0,
+            1.0, 1.0, 0.0, 1.0,
+            1.0, 0.0, 1.0, 1.0,
+            0.0, 1.0, 1.0, 1.0,
+            0.0, 1.0, 1.0, 1.0,
             1.0, 0.0, 0.0, 1.0,
         ])
         .with_indices(vec![
@@ -80,7 +82,7 @@ impl CustomEntity for Cube {
     fn fixed_update(&mut self, a: &mut InternalEntity, state: &mut GameState, dt: f32) {
         //a.transform.add_position(4.0 * engine::FRONT * dt);
         self.timer += dt;
-        a.transform.add_position(engine::FRONT*dt);
+        a.transform.add_position(engine::FRONT * dt);
         if self.timer >= 3.2 {
             state.kill_entity(a);
         }
@@ -99,7 +101,7 @@ impl CustomEntity for Cube {
 pub struct Game {
     prev_mouse_pos: DVec2,
     timer: i32,
-    cam_speed: f32
+    cam_speed: f32,
 }
 impl GameCallbacks for Game {
     fn start(&mut self, state: &mut GameState) {
@@ -116,20 +118,24 @@ impl GameCallbacks for Game {
     fn input(&mut self, state: &mut GameState, input: &Input) {
         match *input {
             Input::Key(glfw::Key::W, glfw::Action::Repeat, _) => {
-                state.camera.position += state.camera.front*self.cam_speed*state.fixed_dt();
+                state.camera.position += state.camera.front * self.cam_speed * state.fixed_dt();
             }
             Input::Key(glfw::Key::S, glfw::Action::Repeat, _) => {
-                state.camera.position -= state.camera.front*self.cam_speed*state.fixed_dt();
+                state.camera.position -= state.camera.front * self.cam_speed * state.fixed_dt();
             }
             Input::Key(glfw::Key::A, glfw::Action::Repeat, _) => {
-                state.camera.position -= state.camera.front.cross(Camera::UP).normalize()*self.cam_speed*state.fixed_dt();
+                state.camera.position -= state.camera.front.cross(Camera::UP).normalize()
+                    * self.cam_speed
+                    * state.fixed_dt();
             }
             Input::Key(glfw::Key::D, glfw::Action::Repeat, _) => {
-                state.camera.position += state.camera.front.cross(Camera::UP).normalize()*self.cam_speed*state.fixed_dt();
+                state.camera.position += state.camera.front.cross(Camera::UP).normalize()
+                    * self.cam_speed
+                    * state.fixed_dt();
             }
             CursorPos(x, y) => {
                 //println!("[GameState] CursorPos");
-                let new_mouse_position = DVec2::new(x, y);
+                let new_mouse_position = DVec2::new(x.0, y.0);
                 if self.prev_mouse_pos == DVec2::splat(-1.0) {
                     self.prev_mouse_pos = new_mouse_position;
                     return;
@@ -141,7 +147,7 @@ impl GameCallbacks for Game {
                 let sens = 8.0;
                 dx *= state.fixed_dt() * sens;
                 dy *= state.fixed_dt() * sens;
-                
+
                 let cam = &mut state.camera;
                 cam.yaw += dx;
                 cam.pitch = (cam.pitch - dy).clamp(-89.0, 89.0);
@@ -163,19 +169,36 @@ impl GameCallbacks for Game {
 
 pub struct App;
 impl AppCallbacks for App {
-    fn start(&self, _app: &mut engine::App) {
-        
-    }
-    
+    fn start(&self, _app: &mut engine::App) {}
+
     fn update(&self, app: &mut engine::App) {
         if app.window().get_key(glfw::Key::W) == Action::Press {
-            app.send_to_game_state(engine::ToGameState::InputMessage(Input::Key(glfw::Key::W, glfw::Action::Repeat, glfw::Modifiers::empty())));
-        }else if app.window().get_key(glfw::Key::S) == Action::Press {
-            app.send_to_game_state(engine::ToGameState::InputMessage(Input::Key(glfw::Key::S, glfw::Action::Repeat, glfw::Modifiers::empty())));
-        }else if app.window().get_key(glfw::Key::A) == Action::Press {
-            app.send_to_game_state(engine::ToGameState::InputMessage(Input::Key(glfw::Key::A, glfw::Action::Repeat, glfw::Modifiers::empty())));
-        }else if app.window().get_key(glfw::Key::D) == Action::Press {
-            app.send_to_game_state(engine::ToGameState::InputMessage(Input::Key(glfw::Key::D, glfw::Action::Repeat, glfw::Modifiers::empty())));
+            app.add_game_state_input(engine::ToGameState::InputMessage(Input::Key(
+                glfw::Key::W,
+                glfw::Action::Repeat,
+                glfw::Modifiers::empty(),
+            )));
+        }
+        if app.window().get_key(glfw::Key::S) == Action::Press {
+            app.add_game_state_input(engine::ToGameState::InputMessage(Input::Key(
+                glfw::Key::S,
+                glfw::Action::Repeat,
+                glfw::Modifiers::empty(),
+            )));
+        }
+        if app.window().get_key(glfw::Key::A) == Action::Press {
+            app.add_game_state_input(engine::ToGameState::InputMessage(Input::Key(
+                glfw::Key::A,
+                glfw::Action::Repeat,
+                glfw::Modifiers::empty(),
+            )));
+        }
+        if app.window().get_key(glfw::Key::D) == Action::Press {
+            app.add_game_state_input(engine::ToGameState::InputMessage(Input::Key(
+                glfw::Key::D,
+                glfw::Action::Repeat,
+                glfw::Modifiers::empty(),
+            )));
         }
     }
 }
@@ -183,7 +206,7 @@ impl AppCallbacks for App {
 pub static mut GAME: Game = Game {
     prev_mouse_pos: DVec2 { x: -1.0, y: -1.0 },
     timer: 0i32,
-    cam_speed: 0.4
+    cam_speed: 8.4,
 };
 
 fn main() {
