@@ -9,9 +9,9 @@ use gl::{
     Uniform1f, Uniform3fv, UniformMatrix4fv, UseProgram, VERTEX_SHADER,
 };
 use glam::{Mat4, Vec3};
+use gltf::{Glb, Gltf};
 use std::{
-    ffi::{CStr, CString, c_char, c_int, c_uint},
-    fmt::Display,
+    collections::HashMap, ffi::{CStr, CString, c_char, c_int, c_uint}, fmt::{Debug, Display}, fs::File, ops::Index
 };
 
 pub mod uniform {
@@ -25,7 +25,7 @@ pub mod uniform {
     pub const SCALE: &str = "scale";
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum WireType {
     /// Displays a classic wireframe
     Triangle,
@@ -87,7 +87,7 @@ impl MeshBuilder {
         if indices.len() < 3 {
             println!("Invalid mesh data. Indices must be more than 2 to form at least 1 triangle.");
             self._invalid = true;
-        } else if indices.len() % 3 != 0 {
+        } else if !indices.len().is_multiple_of(3) {
             println!("Invalid mesh data. Indices must be in pairs of 3.");
             self._invalid = true;
         }
@@ -201,6 +201,120 @@ impl Mesh {
 
     pub fn is_invalid(&self) -> bool {
         self._invalid
+    }
+}
+
+pub enum ExtraOptions {
+    Nothing,
+    BakeWireframe(WireType)
+}
+
+pub enum MeshFileType {
+    GLTF,
+}
+
+impl MeshFileType {
+    pub fn as_str(&self) -> &str {
+        match *self {
+            MeshFileType::GLTF => ".gltf"
+        }
+    }
+}
+
+pub enum LoadMeshError {
+    IOError(std::io::Error),
+    GLTFError(gltf::Error),
+}
+
+impl Debug for LoadMeshError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut msg = String::from("Load Mesh Error! ");
+        match self {
+            LoadMeshError::IOError(x) => {
+                msg.push_str(format!("{:?}", x).as_str());
+            }
+            LoadMeshError::GLTFError(x) => {
+                msg.push_str(format!("{:?}", x).as_str());
+            }
+        }
+
+        f.write_str(msg.as_str())
+    }
+}
+
+pub struct MeshAsset {
+    name: Box<str>,
+    file_type: MeshFileType,
+    extra: ExtraOptions
+}
+
+impl MeshAsset {
+    pub fn new(name:&str, r#type:MeshFileType, extra: ExtraOptions) -> Self {
+        Self { name: name.into(), file_type: r#type, extra }
+    }
+
+    pub fn load_mesh(&self) -> Result<Mesh, LoadMeshError> {
+        // use MeshFileType as M;
+        use ExtraOptions as E;
+
+        let cwd = std::env::current_dir();
+        if let Err(x) = cwd {
+            return Err(LoadMeshError::IOError(x))
+        }
+        let cwd = cwd.unwrap();
+
+        let mut p = String::from(self.name.clone());
+        p.push_str(self.file_type.as_str());
+        let file_path = cwd.join(p);
+        println!("{}", file_path.to_str().unwrap());
+        let res = gltf::import(file_path);
+        if let Err(x) = res {
+            return Err(LoadMeshError::GLTFError(x));
+        }
+        let (doc, buffers, _) = res.unwrap();
+        let mut vertices = Vec::<f32>::new();
+        let mut indices = Vec::<c_uint>::new();
+        let mut colors = Vec::<f32>::new();
+        for mesh in doc.meshes() {
+            let mut read_offset = 0;
+            for p in mesh.primitives() {
+                let r = p.reader(|buffer| Some(&buffers[buffer.index()]));
+
+                let mut add_offset = 0;
+                if let Some(a) = r.read_positions() {
+                    for position in a {
+                        vertices.extend_from_slice(&position);
+                        add_offset += 1;
+                    }
+                }
+
+                if let Some(a) = r.read_indices() {
+                    for index in a.into_u32() {
+                        indices.push(read_offset + index as c_uint);
+                    }
+                }
+
+                if let Some(a) = r.read_colors(4) {
+                    for c in a.into_rgba_f32() {
+                        colors.extend_from_slice(&c);
+                    }
+                }
+                
+                read_offset += add_offset;
+            }
+        }
+        
+        let mut mesh = MeshBuilder::builder(vertices)
+            .with_colors(colors)
+            .with_indices(indices)
+            .build();
+        match &self.extra {
+            E::BakeWireframe(x) => {
+                mesh = mesh.bake_wireframe(x.clone());
+            }
+            E::Nothing => {}
+        }
+        Ok(mesh)
     }
 }
 

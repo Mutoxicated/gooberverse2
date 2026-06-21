@@ -1,10 +1,8 @@
 use std::{
-    sync::{
+    any::TypeId, collections::HashMap, sync::{
         Arc,
         mpsc::{Receiver, Sender},
-    },
-    thread,
-    time::Duration,
+    }, thread, time::Duration
 };
 
 use crate::{
@@ -15,7 +13,7 @@ use crate::{
     transform::Transform,
 };
 use ordered_float::OrderedFloat;
-use render::RenderObject;
+use render::{Mesh, RenderObject};
 
 pub struct InternalEntity {
     pub(crate) id: u64,
@@ -66,6 +64,7 @@ pub struct GameState {
     fixed_delta_time: f32,
     to_app: Sender<ToApp>,
     inbox: Receiver<ToGameState>,
+    test: HashMap<TypeId, Mesh>,
 }
 
 //self.entities.insert(id, entity_holder);
@@ -83,6 +82,7 @@ impl GameState {
             fixed_delta_time: (fixed_timestep as f32) / 1000.0,
             to_app,
             inbox,
+            test: HashMap::new(),
         }
     }
 
@@ -129,7 +129,8 @@ impl GameState {
             if e.internal.is_dead {
                 continue;
             }
-            if !e.custom.mesh().is_invalid() {
+            let m = self.test.get(&e.custom.type_id());
+            if let Some(x) = m && !x.is_invalid(){
                 robjs.push(e.get_render_object());
             }
             self.entities.push(e);
@@ -160,13 +161,21 @@ impl GameState {
             internal,
             custom: Box::new(custom),
         };
+        entity.custom.start(&mut entity.internal, self);
+        let res = entity.custom.mesh_asset().load_mesh();
+        if let Err(x) = res {
+            println!("{x:?}");
+            self.entities.push(entity);
+            return uid;
+        }
+        let m = res.unwrap();
+        self.test.insert(entity.custom.type_id(), m);
         let _ = self.to_app.send(CreateEntityRenderer(
-            entity.custom.mesh(),
+            self.test[&entity.custom.type_id()].clone(),
             entity.internal.id,
         ));
-        entity.custom.start(&mut entity.internal, self);
-        self.entities.push(entity);
 
+        self.entities.push(entity);
         uid
     }
 
