@@ -1,3 +1,5 @@
+#![allow(clippy::wrong_self_convention)]
+
 mod app;
 mod camera;
 mod constants;
@@ -5,6 +7,8 @@ pub mod game_state;
 mod renderer;
 mod transform;
 mod utils;
+
+use std::any::TypeId;
 
 pub use app::App;
 pub use camera::Camera;
@@ -33,6 +37,7 @@ pub const RIGHT: Vec3 = Vec3 {
 
 use gl::{BLEND, DEPTH_TEST, MULTISAMPLE, ONE_MINUS_SRC_ALPHA, SRC_ALPHA};
 use glfw::{Context, Glfw, GlfwReceiver, PWindow, WindowEvent};
+use render::MeshAsset;
 use render::{ObjectShader, ShaderInfo};
 
 use crate::app::AppBuilder;
@@ -47,8 +52,9 @@ pub trait CustomEntity: Send + 'static {
         game_state: &mut GameState,
         fixed_dt: f32,
     );
-    fn mesh(&self) -> &'static render::Mesh;
+    fn mesh_asset(&self) -> MeshAsset;
     fn shaders_to_use(&self) -> &'static Vec<u8>;
+    fn type_id(&self) -> TypeId;
 }
 
 pub const SHADERS_PATH: &str = "./assets/shaders/";

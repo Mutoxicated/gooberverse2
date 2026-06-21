@@ -1,5 +1,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
+use std::any::TypeId;
+
 use engine::{
     AppCallbacks, Camera, CustomEntity, EngineBuilder, GameCallbacks, GameState,
     Input::{self, CursorPos},
@@ -8,7 +10,7 @@ use engine::{
 use glam::{DVec2, Vec3};
 use glfw::Action;
 use lazy_static::lazy_static;
-use render::{InnerObjectShader, MeshBuilder, ShaderInfo, SpecialUnis};
+use render::{ExtraOptions, InnerObjectShader, MeshAsset, MeshBuilder, MeshFileType, ShaderInfo, SpecialUnis, WireType};
 
 pub struct WireShader;
 impl ShaderInfo for WireShader {
@@ -88,12 +90,16 @@ impl CustomEntity for Cube {
         }
     }
 
-    fn mesh(&self) -> &'static render::Mesh {
-        &CUBE_MESH
+    fn mesh_asset(&self) -> MeshAsset {
+        MeshAsset::new("assets/meshes/cube", MeshFileType::GLTF, ExtraOptions::BakeWireframe(WireType::Quad))
     }
 
     fn shaders_to_use(&self) -> &'static Vec<u8> {
         &CUBE_SHADERS
+    }
+
+    fn type_id(&self) -> TypeId {
+        TypeId::of::<Cube>()
     }
 }
 

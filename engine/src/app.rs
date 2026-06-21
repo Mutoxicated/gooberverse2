@@ -1,5 +1,6 @@
 use glfw::{Action, Context, Glfw, GlfwReceiver, PWindow, WindowEvent};
 use render::Mesh;
+use std::any::TypeId;
 use std::assert_matches;
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
@@ -15,7 +16,7 @@ use crate::{
 
 pub enum ToApp {
     StartRender(Batch),
-    CreateEntityRenderer(&'static Mesh, u64),
+    CreateEntityRenderer(Mesh, u64),
     RemoveEntityRenderer(u64),
     InputRequest(),
 }

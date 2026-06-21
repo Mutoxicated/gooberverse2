@@ -76,7 +76,7 @@ impl Renderer {
         get_gl_error!();
     }
 
-    pub fn new_entity_renderer(&mut self, mesh: &'static Mesh, eid: u64) {
+    pub fn new_entity_renderer(&mut self, mesh: &Mesh, eid: u64) {
         self.entity_renderers
             .insert(eid, EntityRenderer::init(mesh));
     }
