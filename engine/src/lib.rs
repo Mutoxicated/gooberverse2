@@ -57,8 +57,8 @@ pub trait CustomEntity: Send + 'static {
     fn type_id(&self) -> TypeId;
 }
 
-pub const SHADERS_PATH: &str = "./assets/shaders/";
-pub const MESHES_PATH: &str = "./assets/meshes/";
+pub const SHADERS_PATH: &str = "assets/shaders/";
+pub const MESHES_PATH: &str = "assets/meshes/";
 
 pub struct EngineBuilder {
     width: u32,
@@ -173,8 +173,12 @@ impl EngineBuilder {
         let mut glfw = Self::glfw_constructor();
         let (window, events) = Self::window_event_constructor(&mut glfw, self.width, self.height);
         let mut obj_shaders: Vec<ObjectShader> = Vec::new();
+        let cwd = std::env::current_dir().unwrap();
         for v in self.shader_info.unwrap() {
-            obj_shaders.push(ObjectShader::new(v, SHADERS_PATH.to_owned()));
+            obj_shaders.push(ObjectShader::new(
+                v,
+                cwd.join(SHADERS_PATH).to_string_lossy().to_string(),
+            ));
         }
 
         let (sender, r) = std::sync::mpsc::channel::<ToGameState>();

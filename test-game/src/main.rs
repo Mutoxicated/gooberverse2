@@ -3,9 +3,8 @@
 use std::any::TypeId;
 
 use engine::{
-    AppCallbacks, Camera, CustomEntity, EngineBuilder, GameCallbacks, GameState,
-    Input::{self, CursorPos},
-    InternalEntity, WORLD_AMBIENCE, WORLD_SCALE,
+    AppCallbacks, CustomEntity, EngineBuilder, GameCallbacks, GameState, Input, InternalEntity,
+    WORLD_AMBIENCE, WORLD_SCALE,
 };
 use glam::{DVec2, Vec3};
 use glfw::Action;
@@ -53,12 +52,11 @@ impl CustomEntity for Cube {
     }
 
     fn fixed_update(&mut self, a: &mut InternalEntity, state: &mut GameState, dt: f32) {
-        //a.transform.add_position(4.0 * engine::FRONT * dt);
         self.timer += dt;
         a.transform.add_position(engine::RIGHT * dt);
-        // if self.timer >= 3.2 {
-        //     state.kill_entity(a);
-        // }
+        if self.timer >= 3.2 {
+            state.kill_entity(a);
+        }
     }
 
     fn mesh_asset(&self) -> MeshAsset {
@@ -89,11 +87,11 @@ impl GameCallbacks for Game {
         state.new_entity(Cube::default());
     }
 
-    fn update(&mut self, _state: &mut GameState) {
+    fn update(&mut self, state: &mut GameState) {
         self.timer += 1;
-        // if self.timer % 32 == 0 {
-        //     state.new_entity(Cube::default());
-        // }
+        if self.timer % 32 == 0 {
+            state.new_entity(Cube::default());
+        }
     }
 
     fn input(&mut self, state: &mut GameState, input: &Input) {

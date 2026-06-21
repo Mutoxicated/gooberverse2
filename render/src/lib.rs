@@ -11,6 +11,7 @@ use gl::{
 };
 use glam::{Mat4, Vec3};
 use std::{
+    any::TypeId,
     ffi::{CStr, CString, c_char, c_int, c_uint},
     fmt::{Debug, Display},
 };
@@ -200,6 +201,6 @@ impl InnerObjectShader {
 
 pub struct RenderObject {
     pub model_matrix: Mat4,
-    pub entity_id: u64,
+    pub entity_type_id: TypeId,
     pub shaders_to_use: Vec<u8>,
 }

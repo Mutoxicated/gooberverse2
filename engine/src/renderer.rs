@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{any::TypeId, collections::HashMap, sync::Arc};
 
 use gl::{COLOR_BUFFER_BIT, DEPTH_BUFFER_BIT};
 use glam::{Mat4, Vec3};
@@ -30,7 +30,7 @@ impl Batch {
 
 pub struct Renderer {
     pub shaders: Vec<ObjectShader>,
-    entity_renderers: HashMap<u64, EntityRenderer>,
+    entity_renderers: HashMap<TypeId, EntityRenderer>,
     _fixed_timestep: f32,
 }
 
@@ -62,7 +62,7 @@ impl Renderer {
             cam_pos: camera.pos,
         };
         for obj in objs.iter() {
-            if !self.entity_renderers.contains_key(&obj.entity_id) {
+            if !self.entity_renderers.contains_key(&obj.entity_type_id) {
                 continue;
             }
             for shader_index in &obj.shaders_to_use {
@@ -70,18 +70,18 @@ impl Renderer {
                 os.shader.activate();
                 os.shader.set_mat4(MODEL, obj.model_matrix);
                 os.info.set_special_uniforms(&special_unis, &os.shader);
-                self.entity_renderers[&obj.entity_id].draw();
+                self.entity_renderers[&obj.entity_type_id].draw();
             }
         }
         get_gl_error!();
     }
 
-    pub fn new_entity_renderer(&mut self, mesh: &Mesh, eid: u64) {
+    pub fn new_entity_renderer(&mut self, mesh: &Mesh, tid: TypeId) {
         self.entity_renderers
-            .insert(eid, EntityRenderer::init(mesh));
+            .insert(tid, EntityRenderer::init(mesh));
     }
 
-    pub fn remove_entity_renderer(&mut self, eid: u64) {
-        self.entity_renderers.remove(&eid);
+    pub fn remove_entity_renderer(&mut self, tid: TypeId) {
+        self.entity_renderers.remove(&tid);
     }
 }

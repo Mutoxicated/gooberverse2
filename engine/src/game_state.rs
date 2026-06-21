@@ -1,6 +1,5 @@
 use std::{
     any::TypeId,
-    collections::HashMap,
     sync::{
         Arc,
         mpsc::{Receiver, Sender},
@@ -17,12 +16,14 @@ use crate::{
     transform::Transform,
 };
 use ordered_float::OrderedFloat;
-use render::{RenderObject, mesh::Mesh};
+use render::RenderObject;
 
 pub struct InternalEntity {
     pub(crate) id: u64,
     pub transform: Transform,
     pub(crate) is_dead: bool,
+    pub(crate) entity_type_id: TypeId,
+    pub(crate) index: usize,
 }
 
 impl InternalEntity {
@@ -40,7 +41,7 @@ impl Entity {
     pub fn get_render_object(&self) -> RenderObject {
         RenderObject {
             model_matrix: self.internal.transform.model_matrix(),
-            entity_id: self.internal.id,
+            entity_type_id: self.custom.type_id(),
             shaders_to_use: self.custom.shaders_to_use().clone(),
         }
     }
@@ -68,7 +69,6 @@ pub struct GameState {
     fixed_delta_time: f32,
     to_app: Sender<ToApp>,
     inbox: Receiver<ToGameState>,
-    test: HashMap<TypeId, Mesh>,
 }
 
 //self.entities.insert(id, entity_holder);
@@ -86,7 +86,6 @@ impl GameState {
             fixed_delta_time: (fixed_timestep as f32) / 1000.0,
             to_app,
             inbox,
-            test: HashMap::new(),
         }
     }
 
@@ -127,18 +126,13 @@ impl GameState {
 
         let dt = self.fixed_dt();
         let mut robjs = Vec::<RenderObject>::with_capacity(entities_len);
-        let entities: Vec<_> = self.entities.drain(..).collect();
-        for mut e in entities {
+        for i in (0..entities_len).rev() {
+            let mut e = self.entities.remove(i);
             e.custom.fixed_update(&mut e.internal, self, dt);
             if e.internal.is_dead {
                 continue;
             }
-            let m = self.test.get(&e.custom.type_id());
-            if let Some(x) = m
-                && !x.is_invalid()
-            {
-                robjs.push(e.get_render_object());
-            }
+            robjs.push(e.get_render_object());
             self.entities.push(e);
         }
         robjs.into()
@@ -162,6 +156,8 @@ impl GameState {
             id: uid,
             transform: Transform::default(),
             is_dead: false,
+            entity_type_id: custom.type_id(),
+            index: self.entities.len(),
         };
         let mut entity = Entity {
             internal,
@@ -170,19 +166,12 @@ impl GameState {
         entity.custom.start(&mut entity.internal, self);
 
         let tid = entity.custom.type_id();
-        if !self.test.contains_key(&tid) {
-            let res = entity.custom.mesh_asset().load_mesh();
-            if let Err(x) = res {
-                println!("{x:?}");
-                self.entities.push(entity);
-                return uid;
-            }
-            self.test.insert(tid, res.unwrap());
+
+        if !self.entities.iter().any(|x| x.custom.type_id() == tid) {
+            let _ = self
+                .to_app
+                .send(CreateEntityRenderer(entity.custom.mesh_asset(), tid));
         }
-        let _ = self.to_app.send(CreateEntityRenderer(
-            self.test[&entity.custom.type_id()].clone(),
-            entity.internal.id,
-        ));
 
         self.entities.push(entity);
         uid
@@ -190,6 +179,14 @@ impl GameState {
 
     pub fn kill_entity(&mut self, internal: &mut InternalEntity) {
         internal.is_dead = true;
-        let _ = self.to_app.send(RemoveEntityRenderer(internal.id));
+        if !self
+            .entities
+            .iter()
+            .any(|x| x.custom.type_id() == internal.entity_type_id)
+        {
+            let _ = self
+                .to_app
+                .send(RemoveEntityRenderer(internal.entity_type_id));
+        }
     }
 }

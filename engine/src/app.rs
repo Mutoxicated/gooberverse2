@@ -1,5 +1,6 @@
 use glfw::{Action, Context, Glfw, GlfwReceiver, PWindow, WindowEvent};
-use render::mesh::Mesh;
+use render::mesh::MeshAsset;
+use std::any::TypeId;
 use std::assert_matches;
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
@@ -15,8 +16,8 @@ use crate::{
 
 pub enum ToApp {
     StartRender(Batch),
-    CreateEntityRenderer(Mesh, u64),
-    RemoveEntityRenderer(u64),
+    CreateEntityRenderer(MeshAsset, TypeId),
+    RemoveEntityRenderer(TypeId),
     InputRequest(),
 }
 
@@ -162,8 +163,13 @@ impl App {
             msgs.iter().partition(|a| matches!(a, T::StartRender(_)));
         for msg in &others {
             match *msg {
-                T::CreateEntityRenderer(mesh, eid) => {
-                    self.renderer.new_entity_renderer(mesh, *eid);
+                T::CreateEntityRenderer(mesh, tid) => {
+                    let res = mesh.load_mesh();
+                    if let Ok(x) = res {
+                        self.renderer.new_entity_renderer(&x, tid.clone());
+                    } else {
+                        println!("{:?}", res.unwrap_err())
+                    }
                 }
                 T::RemoveEntityRenderer(eid) => {
                     self.renderer.remove_entity_renderer(*eid);
