@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use gl::{COLOR_BUFFER_BIT, DEPTH_BUFFER_BIT};
 use glam::{Mat4, Vec3};
-use render::{EntityRenderer, Mesh, ObjectShader, RenderObject};
+use render::{EntityRenderer, ObjectShader, RenderObject, mesh::Mesh};
 
 use crate::{WORLD_SCALE, get_gl_error};
 

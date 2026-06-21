@@ -1,8 +1,12 @@
 use std::{
-    any::TypeId, collections::HashMap, sync::{
+    any::TypeId,
+    collections::HashMap,
+    sync::{
         Arc,
         mpsc::{Receiver, Sender},
-    }, thread, time::Duration
+    },
+    thread,
+    time::Duration,
 };
 
 use crate::{
@@ -13,7 +17,7 @@ use crate::{
     transform::Transform,
 };
 use ordered_float::OrderedFloat;
-use render::{Mesh, RenderObject};
+use render::{RenderObject, mesh::Mesh};
 
 pub struct InternalEntity {
     pub(crate) id: u64,
@@ -130,7 +134,9 @@ impl GameState {
                 continue;
             }
             let m = self.test.get(&e.custom.type_id());
-            if let Some(x) = m && !x.is_invalid(){
+            if let Some(x) = m
+                && !x.is_invalid()
+            {
                 robjs.push(e.get_render_object());
             }
             self.entities.push(e);
@@ -162,14 +168,17 @@ impl GameState {
             custom: Box::new(custom),
         };
         entity.custom.start(&mut entity.internal, self);
-        let res = entity.custom.mesh_asset().load_mesh();
-        if let Err(x) = res {
-            println!("{x:?}");
-            self.entities.push(entity);
-            return uid;
+
+        let tid = entity.custom.type_id();
+        if !self.test.contains_key(&tid) {
+            let res = entity.custom.mesh_asset().load_mesh();
+            if let Err(x) = res {
+                println!("{x:?}");
+                self.entities.push(entity);
+                return uid;
+            }
+            self.test.insert(tid, res.unwrap());
         }
-        let m = res.unwrap();
-        self.test.insert(entity.custom.type_id(), m);
         let _ = self.to_app.send(CreateEntityRenderer(
             self.test[&entity.custom.type_id()].clone(),
             entity.internal.id,

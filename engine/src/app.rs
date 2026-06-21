@@ -1,6 +1,5 @@
 use glfw::{Action, Context, Glfw, GlfwReceiver, PWindow, WindowEvent};
-use render::Mesh;
-use std::any::TypeId;
+use render::mesh::Mesh;
 use std::assert_matches;
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
@@ -141,9 +140,14 @@ impl App {
                         .send(InputMessage(Input::Scroll(dy.into())));
                 }
                 W::CursorPos(x, y) => {
-                    let _ = self
-                        .to_game_state
-                        .send(InputMessage(Input::CursorPos(x.into(), y.into())));
+                    if !self
+                        .game_inputs
+                        .iter()
+                        .any(|(a, _)| matches!(a, Input::CursorPos(_, _)))
+                    {
+                        self.game_inputs
+                            .insert(Input::CursorPos(x.into(), y.into()), ());
+                    }
                 }
                 _ => {}
             }

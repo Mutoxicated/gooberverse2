@@ -37,7 +37,7 @@ pub const RIGHT: Vec3 = Vec3 {
 
 use gl::{BLEND, DEPTH_TEST, MULTISAMPLE, ONE_MINUS_SRC_ALPHA, SRC_ALPHA};
 use glfw::{Context, Glfw, GlfwReceiver, PWindow, WindowEvent};
-use render::MeshAsset;
+use render::mesh::MeshAsset;
 use render::{ObjectShader, ShaderInfo};
 
 use crate::app::AppBuilder;

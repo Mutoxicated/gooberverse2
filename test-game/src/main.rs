@@ -10,7 +10,10 @@ use engine::{
 use glam::{DVec2, Vec3};
 use glfw::Action;
 use lazy_static::lazy_static;
-use render::{ExtraOptions, InnerObjectShader, MeshAsset, MeshBuilder, MeshFileType, ShaderInfo, SpecialUnis, WireType};
+use render::{
+    InnerObjectShader, ShaderInfo, SpecialUnis,
+    mesh::{ExtraOptions, MeshAsset, MeshFileType, WireType},
+};
 
 pub struct WireShader;
 impl ShaderInfo for WireShader {
@@ -41,57 +44,29 @@ struct Cube {
 }
 
 lazy_static! {
-    static ref CUBE_MESH: render::Mesh = MeshBuilder::builder(vec![
-            -5.0, -5.0, -5.0,
-            5.0, -5.0, -5.0,
-            5.0, 5.0, -5.0,
-            -5.0, 5.0, -5.0,
-
-            -5.0, -5.0, 5.0,
-            5.0, -5.0, 5.0,
-            5.0, 5.0, 5.0,
-            -5.0, 5.0, 5.0,
-        ])
-        .with_colors(vec![
-            1.0, 0.0, 0.0, 1.0,
-            0.0, 1.0, 0.0, 1.0,
-            0.0, 0.0, 1.0, 1.0,
-            1.0, 1.0, 0.0, 1.0,
-            1.0, 0.0, 1.0, 1.0,
-            0.0, 1.0, 1.0, 1.0,
-            0.0, 1.0, 1.0, 1.0,
-            1.0, 0.0, 0.0, 1.0,
-        ])
-        .with_indices(vec![
-            0, 1, 2, 0, 2, 3, // front
-            4, 5, 6, 4, 6, 7, // back
-            0, 4, 7, 0, 7, 3, // left
-            1, 5, 6, 1, 6, 2, // right
-            0, 1, 5, 0, 5, 4, // bottom
-            3, 2, 6, 3, 6, 7, // top
-        ])
-        .build()
-        .bake_wireframe(render::WireType::Quad);
-
     static ref CUBE_SHADERS: Vec<u8> = vec![0, 1];
 }
 
 impl CustomEntity for Cube {
     fn start(&mut self, i: &mut InternalEntity, _: &mut GameState) {
-        i.transform.set_position(Vec3::new(20.0, 0.0, 10.0));
+        i.transform.set_position(Vec3::new(0.0, 0.0, 10.0));
     }
 
     fn fixed_update(&mut self, a: &mut InternalEntity, state: &mut GameState, dt: f32) {
         //a.transform.add_position(4.0 * engine::FRONT * dt);
         self.timer += dt;
-        a.transform.add_position(engine::FRONT * dt);
-        if self.timer >= 3.2 {
-            state.kill_entity(a);
-        }
+        a.transform.add_position(engine::RIGHT * dt);
+        // if self.timer >= 3.2 {
+        //     state.kill_entity(a);
+        // }
     }
 
     fn mesh_asset(&self) -> MeshAsset {
-        MeshAsset::new("assets/meshes/cube", MeshFileType::GLTF, ExtraOptions::BakeWireframe(WireType::Quad))
+        MeshAsset::new(
+            "assets/meshes/cube",
+            MeshFileType::GLTF,
+            ExtraOptions::BakeWireframe(WireType::Quad),
+        )
     }
 
     fn shaders_to_use(&self) -> &'static Vec<u8> {
@@ -114,11 +89,11 @@ impl GameCallbacks for Game {
         state.new_entity(Cube::default());
     }
 
-    fn update(&mut self, state: &mut GameState) {
+    fn update(&mut self, _state: &mut GameState) {
         self.timer += 1;
-        if self.timer % 32 == 0 {
-            state.new_entity(Cube::default());
-        }
+        // if self.timer % 32 == 0 {
+        //     state.new_entity(Cube::default());
+        // }
     }
 
     fn input(&mut self, state: &mut GameState, input: &Input) {
@@ -130,43 +105,32 @@ impl GameCallbacks for Game {
                 state.camera.position -= state.camera.front * self.cam_speed * state.fixed_dt();
             }
             Input::Key(glfw::Key::A, glfw::Action::Repeat, _) => {
-                state.camera.position -= state.camera.front.cross(Camera::UP).normalize()
+                state.camera.position += state.camera.front.cross(engine::UP).normalize()
                     * self.cam_speed
                     * state.fixed_dt();
             }
             Input::Key(glfw::Key::D, glfw::Action::Repeat, _) => {
-                state.camera.position += state.camera.front.cross(Camera::UP).normalize()
+                state.camera.position -= state.camera.front.cross(engine::UP).normalize()
                     * self.cam_speed
                     * state.fixed_dt();
             }
-            CursorPos(x, y) => {
+            Input::Scroll(dy) => {
+                let a = dy.0 as f32 * state.fixed_dt() * 180.0;
+                state.camera.fov = (state.camera.fov - a).clamp(30.0, 170.0);
+            }
+            Input::CursorPos(x, y) => {
                 //println!("[GameState] CursorPos");
                 let new_mouse_position = DVec2::new(x.0, y.0);
                 if self.prev_mouse_pos == DVec2::splat(-1.0) {
                     self.prev_mouse_pos = new_mouse_position;
                     return;
                 }
-                let DVec2 { x: dx, y: dy } = new_mouse_position - self.prev_mouse_pos;
+                let data = new_mouse_position - self.prev_mouse_pos;
                 self.prev_mouse_pos = new_mouse_position;
                 //println!("dx: {dx}, dy: {dy}");
-                let (mut dx, mut dy) = (dx as f32, dy as f32);
-                let sens = 8.0;
-                dx *= state.fixed_dt() * sens;
-                dy *= state.fixed_dt() * sens;
-
-                let cam = &mut state.camera;
-                cam.yaw += dx;
-                cam.pitch = (cam.pitch - dy).clamp(-89.0, 89.0);
-
-                let yaw_rad = cam.yaw.to_radians();
-                let pitch_rad = cam.pitch.to_radians();
-
-                cam.front = Vec3 {
-                    x: yaw_rad.cos() * pitch_rad.cos(),
-                    y: pitch_rad.sin(),
-                    z: yaw_rad.sin() * pitch_rad.cos(),
-                }
-                .normalize();
+                state
+                    .camera
+                    .rotate_from_raw_cursor_data(data.as_vec2(), state.fixed_dt());
             }
             _ => {}
         }

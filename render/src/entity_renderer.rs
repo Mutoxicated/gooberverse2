@@ -1,5 +1,5 @@
 use {
-    crate::Mesh,
+    crate::mesh::Mesh,
     gl::{
         ARRAY_BUFFER, BindBuffer, BindVertexArray, BufferData, DeleteBuffers, DeleteVertexArrays,
         DrawElements, ELEMENT_ARRAY_BUFFER, EnableVertexAttribArray, FALSE, FLOAT, GenBuffers,
