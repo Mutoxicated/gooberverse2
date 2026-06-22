@@ -57,8 +57,8 @@ pub trait CustomEntity: Send + 'static {
     fn type_id(&self) -> TypeId;
 }
 
-pub const SHADERS_PATH: &str = "assets/shaders/";
 pub const MESHES_PATH: &str = "assets/meshes/";
+pub const SHADERS_PATH: &str = "assets/shaders/";
 
 pub struct EngineBuilder {
     width: u32,
